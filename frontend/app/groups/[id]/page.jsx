@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../../../lib/authContext";
 import { apiRequest } from "../../../lib/apiClient";
 import Link from "next/link";
@@ -16,7 +16,14 @@ export default function GroupDetailPage() {
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
 
-  const fetchGroupDetail = async () => {
+  // Expenses state
+  const [expenses, setExpenses] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [expensesLoading, setExpensesLoading] = useState(false);
+
+  const fetchGroupDetail = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiRequest(`/groups/${id}`);
@@ -26,15 +33,32 @@ export default function GroupDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  const fetchExpenses = useCallback(async (pageNum = 1) => {
+    try {
+      setExpensesLoading(true);
+      const res = await apiRequest(`/groups/${id}/expenses?page=${pageNum}&limit=10`);
+      setExpenses(res.data.expenses || []);
+      setPage(res.data.currentPage || 1);
+      setTotalPages(res.data.totalPages || 1);
+      setTotalExpenses(res.data.totalExpenses || 0);
+    } catch (err) {
+      // Don't overwrite group error if group loaded
+      console.error("Failed to fetch expenses:", err.message);
+    } finally {
+      setExpensesLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
     } else if (user && id) {
       fetchGroupDetail();
+      fetchExpenses(page);
     }
-  }, [user, authLoading, id, router]);
+  }, [user, authLoading, id, router, page, fetchGroupDetail, fetchExpenses]);
 
   const handleLeaveGroup = async () => {
     if (!confirm("Are you sure you want to leave this group?")) return;
@@ -60,6 +84,19 @@ export default function GroupDetailPage() {
     }
   };
 
+  const handleDeleteExpense = async (expenseId, description) => {
+    if (!confirm(`Are you sure you want to delete the expense "${description}"?`)) return;
+    setError("");
+    setActionMessage("");
+    try {
+      await apiRequest(`/groups/${id}/expenses/${expenseId}`, { method: "DELETE" });
+      setActionMessage(`Expense "${description}" deleted.`);
+      fetchExpenses(page);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   if (authLoading || loading) {
     return <div className="card">Loading group detail...</div>;
   }
@@ -79,6 +116,17 @@ export default function GroupDetailPage() {
   );
   const isAdmin = currentMember?.role === "admin";
 
+  const getCategoryColor = (cat) => {
+    switch (cat) {
+      case "rent": return { bg: "#fee2e2", text: "#991b1b" };
+      case "groceries": return { bg: "#dcfce7", text: "#166534" };
+      case "utilities": return { bg: "#fef3c7", text: "#92400e" };
+      case "food": return { bg: "#ffedd5", text: "#9a3412" };
+      case "travel": return { bg: "#e0e7ff", text: "#3730a3" };
+      default: return { bg: "#f3f4f6", text: "#374151" };
+    }
+  };
+
   return (
     <div>
       <div style={{ marginBottom: "16px" }}>
@@ -90,6 +138,7 @@ export default function GroupDetailPage() {
       {error && <div className="error-message">{error}</div>}
       {actionMessage && <div className="success-message">{actionMessage}</div>}
 
+      {/* Group Header Card */}
       <div className="card" style={{ marginTop: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
@@ -111,6 +160,7 @@ export default function GroupDetailPage() {
           </p>
         </div>
 
+        {/* Member List Section */}
         <h2 style={{ fontSize: "18px", marginTop: "24px", marginBottom: "12px" }}>
           Members ({group.members?.length || 0})
         </h2>
@@ -126,7 +176,7 @@ export default function GroupDetailPage() {
                 key={memberId}
                 style={{
                   display: "flex",
-                  justify: "space-between",
+                  justifyContent: "space-between",
                   alignItems: "center",
                   padding: "10px 12px",
                   border: "1px solid #e5e7eb",
@@ -167,6 +217,153 @@ export default function GroupDetailPage() {
             );
           })}
         </div>
+      </div>
+
+      {/* Expenses Section */}
+      <div className="card" style={{ marginTop: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div>
+            <h2 style={{ fontSize: "18px", margin: 0 }}>Expenses ({totalExpenses})</h2>
+          </div>
+          <Link href={`/groups/${id}/add`}>
+            <button style={{ width: "auto", padding: "6px 14px", fontSize: "13px", backgroundColor: "#2563eb" }}>
+              + Add Expense
+            </button>
+          </Link>
+        </div>
+
+        {expensesLoading ? (
+          <div style={{ padding: "16px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
+            Loading expenses...
+          </div>
+        ) : expenses.length === 0 ? (
+          <div style={{ padding: "16px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
+            No expenses recorded yet. Click <strong>+ Add Expense</strong> above to add one!
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {expenses.map((exp) => {
+              const paidByName = typeof exp.paidBy === "object" ? exp.paidBy?.name : "Someone";
+              const isCreator = (exp.createdBy?._id || exp.createdBy?.id || exp.createdBy) === currentUserId;
+              const canDelete = isCreator || isAdmin;
+              const catStyle = getCategoryColor(exp.category);
+
+              return (
+                <div
+                  key={exp._id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 14px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    background: "#ffffff",
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      <strong style={{ fontSize: "15px", color: "#111827" }}>{exp.description}</strong>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          padding: "1px 6px",
+                          borderRadius: "10px",
+                          background: catStyle.bg,
+                          color: catStyle.text,
+                          fontWeight: 600,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {exp.category}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: "13px", color: "#6b7280" }}>
+                      Paid by <strong>{paidByName}</strong> • Split with {exp.participants?.length || 0} members •{" "}
+                      {new Date(exp.date || exp.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "16px", fontWeight: 700, color: "#111827" }}>
+                        ₹{(exp.amount / 100).toFixed(2)}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#9ca3af" }}>
+                        equal split
+                      </div>
+                    </div>
+
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDeleteExpense(exp._id, exp.description)}
+                        style={{
+                          width: "auto",
+                          padding: "4px 8px",
+                          fontSize: "12px",
+                          backgroundColor: "#fef2f2",
+                          color: "#dc2626",
+                          border: "1px solid #fecaca",
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginTop: "16px",
+                  paddingTop: "12px",
+                  borderTop: "1px solid #e5e7eb",
+                }}
+              >
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  style={{
+                    width: "auto",
+                    padding: "4px 10px",
+                    fontSize: "13px",
+                    backgroundColor: page <= 1 ? "#e5e7eb" : "#f3f4f6",
+                    color: page <= 1 ? "#9ca3af" : "#374151",
+                    cursor: page <= 1 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  ← Previous
+                </button>
+
+                <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                  Page {page} of {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  style={{
+                    width: "auto",
+                    padding: "4px 10px",
+                    fontSize: "13px",
+                    backgroundColor: page >= totalPages ? "#e5e7eb" : "#f3f4f6",
+                    color: page >= totalPages ? "#9ca3af" : "#374151",
+                    cursor: page >= totalPages ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
