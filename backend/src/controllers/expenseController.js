@@ -3,37 +3,56 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const { toPaise } = require("../utils/money");
-const { splitEqually } = require("../services/splitService");
+const { splitEqually, splitUnequal, splitPercentage } = require("../services/splitService");
+const { expenseSchema } = require("../validators/expenseValidator");
+
+// shared helper: validates participants belong to the group, then
+// dispatches to the right split function based on splitType
+const buildParticipants = (splitType, amountInPaise, body, memberIds) => {
+  if (splitType === "equal") {
+    const invalid = body.participantIds.find((id) => !memberIds.includes(id));
+    if (invalid) throw new ApiError(400, `User ${invalid} is not a member of this group`);
+    return splitEqually(amountInPaise, body.participantIds);
+  }
+
+  if (splitType === "unequal") {
+    const invalid = body.participantShares.find((p) => !memberIds.includes(p.user));
+    if (invalid) throw new ApiError(400, `User ${invalid.user} is not a member of this group`);
+    const sharesInPaise = body.participantShares.map((p) => ({
+      user: p.user,
+      share: toPaise(p.share),
+    }));
+    return splitUnequal(amountInPaise, sharesInPaise);
+  }
+
+  if (splitType === "percentage") {
+    const invalid = body.participantPercentages.find((p) => !memberIds.includes(p.user));
+    if (invalid) throw new ApiError(400, `User ${invalid.user} is not a member of this group`);
+    return splitPercentage(amountInPaise, body.participantPercentages);
+  }
+
+  throw new ApiError(400, "Invalid splitType");
+};
 
 // POST /api/groups/:groupId/expenses
 const createExpense = asyncHandler(async (req, res) => {
-  const { amount, description, category, participantIds } = req.body;
-  const groupId = req.params.groupId;
-
-  if (!amount || amount <= 0) throw new ApiError(400, "Amount must be greater than zero");
-  if (!description) throw new ApiError(400, "Description is required");
-  if (!participantIds || participantIds.length === 0) {
-    throw new ApiError(400, "At least one participant is required");
+  const parsed = expenseSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new ApiError(400, parsed.error.errors.map((e) => e.message).join("; "));
   }
+  const body = parsed.data;
 
-  // every participant must actually be a member of this group
-  // req.group was attached by the groupMembership middleware
   const memberIds = req.group.members.map((m) => m.user.toString());
-  const invalidParticipant = participantIds.find((id) => !memberIds.includes(id));
-  if (invalidParticipant) {
-    throw new ApiError(400, `User ${invalidParticipant} is not a member of this group`);
-  }
-
-  const amountInPaise = toPaise(amount);
-  const participants = splitEqually(amountInPaise, participantIds);
+  const amountInPaise = toPaise(body.amount);
+  const participants = buildParticipants(body.splitType, amountInPaise, body, memberIds);
 
   const expense = await Expense.create({
-    group: groupId,
+    group: req.params.groupId,
     paidBy: req.user.id,
     amount: amountInPaise,
-    description,
-    category: category || "other",
-    splitType: "equal",
+    description: body.description,
+    category: body.category || "other",
+    splitType: body.splitType,
     participants,
     createdBy: req.user.id,
   });
@@ -80,6 +99,9 @@ const getExpenseById = asyncHandler(async (req, res) => {
 });
 
 // PATCH /api/groups/:groupId/expenses/:id
+// Now fully unlocked: amount/participants/splitType can all change,
+// which means the split has to be recomputed from scratch — deferred
+// from Milestone 3 specifically until this split logic existed.
 const updateExpense = asyncHandler(async (req, res) => {
   const expense = await Expense.findOne({
     _id: req.params.id,
@@ -87,19 +109,46 @@ const updateExpense = asyncHandler(async (req, res) => {
   });
   if (!expense) throw new ApiError(404, "Expense not found");
 
-  // only the person who created it can edit it (for now — admin override comes later if needed)
   if (expense.createdBy.toString() !== req.user.id) {
     throw new ApiError(403, "Only the creator can edit this expense");
   }
 
-  const { description, category } = req.body;
-  // NOTE: for Milestone 3, only description/category are editable.
-  // Editing amount/participants safely requires re-running split logic —
-  // deferred until Milestone 4 to avoid half-building it twice.
-  if (description) expense.description = description;
-  if (category) expense.category = category;
-  await expense.save();
+  // simple fields, editable directly
+  if (req.body.description) expense.description = req.body.description;
+  if (req.body.category) expense.category = req.body.category;
 
+  // if amount, splitType, or participant data changed, re-run the
+  // whole split calculation rather than trying to patch shares in place
+  const splitFieldsChanged =
+    req.body.amount !== undefined ||
+    req.body.splitType !== undefined ||
+    req.body.participantIds !== undefined ||
+    req.body.participantShares !== undefined ||
+    req.body.participantPercentages !== undefined;
+
+  if (splitFieldsChanged) {
+    const parsed = expenseSchema.safeParse({
+      amount: req.body.amount ?? expense.amount / 100,
+      description: expense.description,
+      category: expense.category,
+      splitType: req.body.splitType ?? expense.splitType,
+      participantIds: req.body.participantIds,
+      participantShares: req.body.participantShares,
+      participantPercentages: req.body.participantPercentages,
+    });
+    if (!parsed.success) {
+      throw new ApiError(400, parsed.error.errors.map((e) => e.message).join("; "));
+    }
+    const body = parsed.data;
+    const memberIds = req.group.members.map((m) => m.user.toString());
+    const amountInPaise = toPaise(body.amount);
+
+    expense.amount = amountInPaise;
+    expense.splitType = body.splitType;
+    expense.participants = buildParticipants(body.splitType, amountInPaise, body, memberIds);
+  }
+
+  await expense.save();
   res.status(200).json(new ApiResponse({ expense }, "Expense updated"));
 });
 

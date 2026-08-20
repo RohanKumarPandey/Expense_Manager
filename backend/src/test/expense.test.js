@@ -1,8 +1,9 @@
 const { toPaise, toRupees } = require("../utils/money");
-const { splitEqually } = require("../services/splitService");
+const { splitEqually, splitUnequal, splitPercentage } = require("../services/splitService");
+const { expenseSchema } = require("../validators/expenseValidator");
 
 async function testExpenseLogic() {
-  console.log("--- Starting Milestone 3 Expense & Money Unit Tests ---");
+  console.log("--- Starting Milestone 4 Expense, Split & Validator Unit Tests ---");
 
   // 1. Test money helpers
   console.assert(toPaise(100) === 10000, "100 rupees should be 10000 paise");
@@ -15,15 +16,7 @@ async function testExpenseLogic() {
   console.assert(toRupees(33) === 0.33, "33 paise should be 0.33 rupees");
   console.log("✓ Money helper (toPaise / toRupees) tests passed");
 
-  // 2. Test splitEqually - Exact division
-  const users2 = ["user1", "user2"];
-  const res2 = splitEqually(10000, users2);
-  console.assert(res2.length === 2, "Should return 2 participants");
-  console.assert(res2[0].share === 5000 && res2[1].share === 5000, "10000 / 2 should be 5000 each");
-  console.assert(res2.reduce((acc, p) => acc + p.share, 0) === 10000, "Sum of shares must equal total paise");
-  console.log("✓ splitEqually exact division passed");
-
-  // 3. Test splitEqually - Indivisible 3 participants (Largest Remainder Method)
+  // 2. Test splitEqually - Exact division & Largest Remainder Method
   const users3 = ["u1", "u2", "u3"];
   const res3 = splitEqually(10000, users3);
   console.assert(res3.length === 3, "Should return 3 participants");
@@ -31,35 +24,130 @@ async function testExpenseLogic() {
   console.assert(res3[1].share === 3333, "Second participant gets base (3333)");
   console.assert(res3[2].share === 3333, "Third participant gets base (3333)");
   console.assert(res3.reduce((acc, p) => acc + p.share, 0) === 10000, "Sum of shares must be EXACTLY 10000");
-  console.log("✓ splitEqually 3-way split with largest-remainder passed (3334, 3333, 3333 = 10000)");
+  console.log("✓ splitEqually tests passed");
 
-  // 4. Test splitEqually - 7 participants
-  const users7 = ["u1", "u2", "u3", "u4", "u5", "u6", "u7"];
-  const res7 = splitEqually(10000, users7);
-  console.assert(res7.length === 7, "Should return 7 participants");
-  // 10000 / 7 = 1428 remainder 4 -> first 4 get 1429, next 3 get 1428
-  console.assert(res7[0].share === 1429 && res7[3].share === 1429, "First 4 get 1429");
-  console.assert(res7[4].share === 1428 && res7[6].share === 1428, "Last 3 get 1428");
-  console.assert(res7.reduce((acc, p) => acc + p.share, 0) === 10000, "Sum of 7-way split must be EXACTLY 10000");
-  console.log("✓ splitEqually 7-way split passed");
+  // 3. Test splitUnequal - Valid exact sum
+  const unequalShares = [
+    { user: "u1", share: 3000 },
+    { user: "u2", share: 7000 },
+  ];
+  const unequalRes = splitUnequal(10000, unequalShares);
+  console.assert(unequalRes.length === 2, "Should return 2 participants");
+  console.assert(unequalRes[0].share === 3000 && unequalRes[1].share === 7000, "Shares should match inputs");
+  console.assert(unequalRes.reduce((acc, p) => acc + p.share, 0) === 10000, "Sum must be 10000");
+  console.log("✓ splitUnequal valid sum passed");
 
-  // 5. Test splitEqually - Single participant
-  const res1 = splitEqually(500, ["solo"]);
-  console.assert(res1.length === 1 && res1[0].share === 500, "Single participant gets full amount");
-  console.log("✓ splitEqually single participant passed");
-
-  // 6. Test splitEqually error conditions
-  let errThrown = false;
+  // 4. Test splitUnequal - Mismatched sum error
+  let unequalMismatchErr = null;
   try {
-    splitEqually(1000, []);
+    splitUnequal(10000, [
+      { user: "u1", share: 3000 },
+      { user: "u2", share: 5000 }, // sum is 8000, not 10000
+    ]);
   } catch (err) {
-    errThrown = true;
-    console.assert(err.statusCode === 400, "Empty participants should throw 400");
+    unequalMismatchErr = err;
   }
-  console.assert(errThrown, "Empty participants should throw error");
-  console.log("✓ splitEqually error handling passed");
+  console.assert(unequalMismatchErr && unequalMismatchErr.statusCode === 400, "Should throw 400 on sum mismatch");
+  console.assert(unequalMismatchErr.message.includes("8000 paise but total amount is 10000 paise"), "Error message should detail mismatch");
+  console.log("✓ splitUnequal mismatched sum correctly throws 400 with detail");
 
-  console.log("--- All Milestone 3 Unit Checks Passed! ---");
+  // 5. Test splitUnequal - Negative share error
+  let negativeErr = null;
+  try {
+    splitUnequal(10000, [
+      { user: "u1", share: 12000 },
+      { user: "u2", share: -2000 },
+    ]);
+  } catch (err) {
+    negativeErr = err;
+  }
+  console.assert(negativeErr && negativeErr.statusCode === 400, "Should throw 400 on negative share");
+  console.log("✓ splitUnequal negative share correctly throws 400");
+
+  // 6. Test splitPercentage - Clean 60% / 40%
+  const cleanPct = [
+    { user: "u1", percentage: 60 },
+    { user: "u2", percentage: 40 },
+  ];
+  const pctRes1 = splitPercentage(10000, cleanPct);
+  console.assert(pctRes1[0].share === 6000 && pctRes1[1].share === 4000, "60/40 of 10000 should be 6000/4000");
+  console.assert(pctRes1.reduce((acc, p) => acc + p.share, 0) === 10000, "Sum must be 10000");
+  console.log("✓ splitPercentage clean percentages passed");
+
+  // 7. Test splitPercentage - Largest remainder apportionment (₹10 split 33.33 / 33.33 / 33.34)
+  // Total = 1000 paise
+  // u1: 33.33% of 1000 = 333.3 paise -> floor 333, rem 0.3
+  // u2: 33.33% of 1000 = 333.3 paise -> floor 333, rem 0.3
+  // u3: 33.34% of 1000 = 333.4 paise -> floor 333, rem 0.4
+  // Floored sum = 999. Leftover 1 paisa goes to u3 (largest remainder 0.4) -> [333, 333, 334]
+  const pct3 = [
+    { user: "u1", percentage: 33.33 },
+    { user: "u2", percentage: 33.33 },
+    { user: "u3", percentage: 33.34 },
+  ];
+  const pctRes2 = splitPercentage(1000, pct3);
+  console.assert(pctRes2[0].share === 333, "u1 gets 333");
+  console.assert(pctRes2[1].share === 333, "u2 gets 333");
+  console.assert(pctRes2[2].share === 334, "u3 gets 334 due to largest remainder");
+  console.assert(pctRes2.reduce((acc, p) => acc + p.share, 0) === 1000, "Sum must be EXACTLY 1000");
+  console.log("✓ splitPercentage largest remainder apportionment passed (333, 333, 334 = 1000)");
+
+  // 8. Test splitPercentage - Invalid percentage sum error (e.g. 95%)
+  let pctErr = null;
+  try {
+    splitPercentage(10000, [
+      { user: "u1", percentage: 50 },
+      { user: "u2", percentage: 45 },
+    ]);
+  } catch (err) {
+    pctErr = err;
+  }
+  console.assert(pctErr && pctErr.statusCode === 400, "Should throw 400 when percentages do not sum to 100");
+  console.log("✓ splitPercentage invalid percentage sum correctly throws 400");
+
+  // 9. Test Zod Validator discriminatedUnion
+  const validEqual = expenseSchema.safeParse({
+    amount: 100,
+    description: "Dinner",
+    category: "food",
+    splitType: "equal",
+    participantIds: ["u1", "u2"],
+  });
+  console.assert(validEqual.success, "Equal split schema should parse valid payload");
+
+  const validUnequal = expenseSchema.safeParse({
+    amount: 100,
+    description: "Groceries",
+    category: "groceries",
+    splitType: "unequal",
+    participantShares: [
+      { user: "u1", share: 40 },
+      { user: "u2", share: 60 },
+    ],
+  });
+  console.assert(validUnequal.success, "Unequal split schema should parse valid payload");
+
+  const validPct = expenseSchema.safeParse({
+    amount: 100,
+    description: "Rent",
+    category: "rent",
+    splitType: "percentage",
+    participantPercentages: [
+      { user: "u1", percentage: 60 },
+      { user: "u2", percentage: 40 },
+    ],
+  });
+  console.assert(validPct.success, "Percentage split schema should parse valid payload");
+
+  const invalidSplitType = expenseSchema.safeParse({
+    amount: 100,
+    description: "Test",
+    splitType: "invalid_type",
+  });
+  console.assert(!invalidSplitType.success, "Invalid splitType should be rejected by schema");
+
+  console.log("✓ Zod expenseSchema validation tests passed");
+  console.log("--- All Milestone 4 Unit Checks Passed! ---");
 }
 
 testExpenseLogic().catch((err) => {

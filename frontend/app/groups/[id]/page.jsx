@@ -290,26 +290,45 @@ export default function GroupDetailPage() {
                       <div style={{ fontSize: "16px", fontWeight: 700, color: "#111827" }}>
                         ₹{(exp.amount / 100).toFixed(2)}
                       </div>
-                      <div style={{ fontSize: "11px", color: "#9ca3af" }}>
-                        equal split
+                      <div style={{ fontSize: "11px", color: "#9ca3af", textTransform: "capitalize" }}>
+                        {exp.splitType || "equal"} split
                       </div>
                     </div>
 
-                    {canDelete && (
-                      <button
-                        onClick={() => handleDeleteExpense(exp._id, exp.description)}
-                        style={{
-                          width: "auto",
-                          padding: "4px 8px",
-                          fontSize: "12px",
-                          backgroundColor: "#fef2f2",
-                          color: "#dc2626",
-                          border: "1px solid #fecaca",
-                        }}
-                      >
-                        Delete
-                      </button>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      {isCreator && (
+                        <Link href={`/groups/${id}/edit/${exp._id}`}>
+                          <button
+                            style={{
+                              width: "auto",
+                              padding: "4px 8px",
+                              fontSize: "12px",
+                              backgroundColor: "#eff6ff",
+                              color: "#2563eb",
+                              border: "1px solid #bfdbfe",
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </Link>
+                      )}
+
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDeleteExpense(exp._id, exp.description)}
+                          style={{
+                            width: "auto",
+                            padding: "4px 8px",
+                            fontSize: "12px",
+                            backgroundColor: "#fef2f2",
+                            color: "#dc2626",
+                            border: "1px solid #fecaca",
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

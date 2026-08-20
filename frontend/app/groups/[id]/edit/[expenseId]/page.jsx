@@ -1,26 +1,27 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useAuth } from "../../../../lib/authContext";
-import { apiRequest } from "../../../../lib/apiClient";
+import { useAuth } from "../../../../../lib/authContext";
+import { apiRequest } from "../../../../../lib/apiClient";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
-export default function AddExpensePage() {
-  const { id } = useParams();
+export default function EditExpensePage() {
+  const { id, expenseId } = useParams();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [group, setGroup] = useState(null);
+  const [expense, setExpense] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Core Form state
+  // Form state
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("other");
-  const [splitType, setSplitType] = useState("equal"); // "equal" | "unequal" | "percentage"
+  const [splitType, setSplitType] = useState("equal");
 
   // Equal split participants
   const [selectedEqualParticipants, setSelectedEqualParticipants] = useState([]);
@@ -37,24 +38,58 @@ export default function AddExpensePage() {
       return;
     }
 
-    if (user && id) {
-      apiRequest(`/groups/${id}`)
-        .then((res) => {
-          const groupData = res.data.group;
+    if (user && id && expenseId) {
+      Promise.all([
+        apiRequest(`/groups/${id}`),
+        apiRequest(`/groups/${id}/expenses/${expenseId}`),
+      ])
+        .then(([groupRes, expenseRes]) => {
+          const groupData = groupRes.data.group;
+          const expenseData = expenseRes.data.expense;
+
+          // Permission check: only creator can edit
+          const currentUserId = user?._id || user?.id;
+          const creatorId = expenseData.createdBy?._id || expenseData.createdBy?.id || expenseData.createdBy;
+          if (creatorId?.toString() !== currentUserId?.toString()) {
+            setError("Only the creator can edit this expense.");
+            setLoading(false);
+            return;
+          }
+
           setGroup(groupData);
+          setExpense(expenseData);
+
+          // Populate form fields
+          setAmount((expenseData.amount / 100).toString());
+          setDescription(expenseData.description || "");
+          setCategory(expenseData.category || "other");
+          setSplitType(expenseData.splitType || "equal");
 
           const memberIds = (groupData.members || []).map((m) =>
             typeof m.user === "object" ? m.user._id || m.user.id : m.user
           );
-          setSelectedEqualParticipants(memberIds);
 
-          // Initial unequal & percentage maps
+          // Build maps for unequal and percentage
           const initialShares = {};
           const initialPercentages = {};
           memberIds.forEach((uid) => {
             initialShares[uid] = "";
             initialPercentages[uid] = "";
           });
+
+          const participantUserIds = [];
+          (expenseData.participants || []).forEach((p) => {
+            const pUid = typeof p.user === "object" ? p.user._id || p.user.id : p.user;
+            participantUserIds.push(pUid);
+            if (p.share !== undefined) {
+              initialShares[pUid] = (p.share / 100).toString();
+            }
+            if (p.percentage !== undefined && p.percentage !== null) {
+              initialPercentages[pUid] = p.percentage.toString();
+            }
+          });
+
+          setSelectedEqualParticipants(participantUserIds.length > 0 ? participantUserIds : memberIds);
           setUnequalShares(initialShares);
           setPercentages(initialPercentages);
         })
@@ -65,7 +100,7 @@ export default function AddExpensePage() {
           setLoading(false);
         });
     }
-  }, [user, authLoading, id, router]);
+  }, [user, authLoading, id, expenseId, router]);
 
   // Calculations for live indicators
   const parsedTotalAmount = parseFloat(amount) || 0;
@@ -199,8 +234,8 @@ export default function AddExpensePage() {
 
     setSubmitting(true);
     try {
-      await apiRequest(`/groups/${id}/expenses`, {
-        method: "POST",
+      await apiRequest(`/groups/${id}/expenses/${expenseId}`, {
+        method: "PATCH",
         body: JSON.stringify(payload),
       });
       router.push(`/groups/${id}`);
@@ -212,10 +247,10 @@ export default function AddExpensePage() {
   };
 
   if (authLoading || loading) {
-    return <div className="card">Loading group members...</div>;
+    return <div className="card">Loading expense details...</div>;
   }
 
-  if (error && !group) {
+  if (error && !expense) {
     return (
       <div className="card">
         <div className="error-message">{error}</div>
@@ -240,7 +275,7 @@ export default function AddExpensePage() {
       </div>
 
       <div className="card" style={{ marginTop: 0 }}>
-        <h1 style={{ fontSize: "22px", marginBottom: "16px" }}>Add Expense</h1>
+        <h1 style={{ fontSize: "22px", marginBottom: "16px" }}>Edit Expense</h1>
 
         {error && <div className="error-message">{error}</div>}
 
@@ -516,7 +551,7 @@ export default function AddExpensePage() {
               cursor: isSubmitDisabled ? "not-allowed" : "pointer",
             }}
           >
-            {submitting ? "Saving Expense..." : "Save Expense"}
+            {submitting ? "Updating Expense..." : "Update Expense"}
           </button>
         </form>
       </div>
