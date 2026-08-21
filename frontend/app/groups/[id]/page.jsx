@@ -20,12 +20,27 @@ export default function GroupDetailPage() {
   const [balances, setBalances] = useState([]);
   const [balancesLoading, setBalancesLoading] = useState(false);
 
-  // Expenses state
+  // Filter, Sort & Search state
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [sortBy, setSortBy] = useState("date");
+  const [sortOrder, setSortOrder] = useState("desc");
+
+  // Expenses pagination state
   const [expenses, setExpenses] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [expensesLoading, setExpensesLoading] = useState(false);
+
+  // Debounce search input by 400ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchGroupDetail = useCallback(async () => {
     try {
@@ -51,31 +66,68 @@ export default function GroupDetailPage() {
     }
   }, [id]);
 
-  const fetchExpenses = useCallback(async (pageNum = 1) => {
-    try {
-      setExpensesLoading(true);
-      const res = await apiRequest(`/groups/${id}/expenses?page=${pageNum}&limit=10`);
-      setExpenses(res.data.expenses || []);
-      setPage(res.data.currentPage || 1);
-      setTotalPages(res.data.totalPages || 1);
-      setTotalExpenses(res.data.totalExpenses || 0);
-    } catch (err) {
-      // Don't overwrite group error if group loaded
-      console.error("Failed to fetch expenses:", err.message);
-    } finally {
-      setExpensesLoading(false);
-    }
-  }, [id]);
+  const fetchExpenses = useCallback(
+    async (
+      pageNum = 1,
+      search = debouncedSearch,
+      cat = categoryFilter,
+      sort = sortBy,
+      order = sortOrder
+    ) => {
+      try {
+        setExpensesLoading(true);
+        const params = new URLSearchParams();
+        params.append("page", pageNum.toString());
+        params.append("limit", "10");
+        if (search) params.append("search", search);
+        if (cat) params.append("category", cat);
+        if (sort) params.append("sortBy", sort);
+        if (order) params.append("order", order);
 
+        const res = await apiRequest(`/groups/${id}/expenses?${params.toString()}`);
+        setExpenses(res.data.expenses || []);
+        setPage(res.data.currentPage || 1);
+        setTotalPages(res.data.totalPages || 1);
+        setTotalExpenses(res.data.totalExpenses || 0);
+      } catch (err) {
+        console.error("Failed to fetch expenses:", err.message);
+      } finally {
+        setExpensesLoading(false);
+      }
+    },
+    [id, debouncedSearch, categoryFilter, sortBy, sortOrder]
+  );
+
+  // Initial fetch for group & balances
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
     } else if (user && id) {
       fetchGroupDetail();
       fetchBalances();
-      fetchExpenses(page);
     }
-  }, [user, authLoading, id, router, page, fetchGroupDetail, fetchBalances, fetchExpenses]);
+  }, [user, authLoading, id, router, fetchGroupDetail, fetchBalances]);
+
+  // Refetch expenses when filters, sort, search, or page changes
+  useEffect(() => {
+    if (user && id) {
+      fetchExpenses(page, debouncedSearch, categoryFilter, sortBy, sortOrder);
+    }
+  }, [user, id, page, debouncedSearch, categoryFilter, sortBy, sortOrder, fetchExpenses]);
+
+  const handleFilterChange = (setter) => (val) => {
+    setter(val);
+    setPage(1); // Reset page on filter/sort change
+  };
+
+  const handleResetFilters = () => {
+    setSearchInput("");
+    setDebouncedSearch("");
+    setCategoryFilter("");
+    setSortBy("date");
+    setSortOrder("desc");
+    setPage(1);
+  };
 
   const handleLeaveGroup = async () => {
     if (!confirm("Are you sure you want to leave this group?")) return;
@@ -109,7 +161,7 @@ export default function GroupDetailPage() {
     try {
       await apiRequest(`/groups/${id}/expenses/${expenseId}`, { method: "DELETE" });
       setActionMessage(`Expense "${description}" deleted.`);
-      fetchExpenses(page);
+      fetchExpenses(page, debouncedSearch, categoryFilter, sortBy, sortOrder);
       fetchBalances();
     } catch (err) {
       setError(err.message);
@@ -145,6 +197,8 @@ export default function GroupDetailPage() {
       default: return { bg: "#f3f4f6", text: "#374151" };
     }
   };
+
+  const hasActiveFilters = Boolean(searchInput || categoryFilter || sortBy !== "date" || sortOrder !== "desc");
 
   return (
     <div>
@@ -345,13 +399,160 @@ export default function GroupDetailPage() {
           </Link>
         </div>
 
+        {/* Filter, Search & Sort Toolbar */}
+        <div
+          style={{
+            background: "#f9fafb",
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            padding: "12px 14px",
+            marginBottom: "16px",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "10px",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          {/* Search Box */}
+          <div style={{ flex: "1 1 200px", minWidth: "180px" }}>
+            <input
+              type="text"
+              placeholder="🔍 Search description..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "7px 10px",
+                fontSize: "13px",
+                border: "1px solid #d1d5db",
+                borderRadius: "6px",
+                background: "#ffffff",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {/* Category Dropdown */}
+          <div style={{ flex: "0 1 150px" }}>
+            <select
+              value={categoryFilter}
+              onChange={(e) => handleFilterChange(setCategoryFilter)(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "7px 10px",
+                fontSize: "13px",
+                border: "1px solid #d1d5db",
+                borderRadius: "6px",
+                background: "#ffffff",
+                boxSizing: "border-box",
+              }}
+            >
+              <option value="">All Categories</option>
+              <option value="rent">Rent</option>
+              <option value="groceries">Groceries</option>
+              <option value="utilities">Utilities</option>
+              <option value="food">Food</option>
+              <option value="travel">Travel</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {/* Sort By Dropdown */}
+          <div style={{ flex: "0 1 120px" }}>
+            <select
+              value={sortBy}
+              onChange={(e) => handleFilterChange(setSortBy)(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "7px 10px",
+                fontSize: "13px",
+                border: "1px solid #d1d5db",
+                borderRadius: "6px",
+                background: "#ffffff",
+                boxSizing: "border-box",
+              }}
+            >
+              <option value="date">Sort: Date</option>
+              <option value="amount">Sort: Amount</option>
+            </select>
+          </div>
+
+          {/* Sort Order Toggle */}
+          <div>
+            <button
+              onClick={() => handleFilterChange(setSortOrder)(sortOrder === "desc" ? "asc" : "desc")}
+              style={{
+                width: "auto",
+                padding: "7px 12px",
+                fontSize: "13px",
+                backgroundColor: "#ffffff",
+                color: "#374151",
+                border: "1px solid #d1d5db",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: 500,
+              }}
+              title={sortOrder === "desc" ? "Descending (Newest / Largest first)" : "Ascending (Oldest / Smallest first)"}
+            >
+              {sortOrder === "desc" ? "↓ Desc" : "↑ Asc"}
+            </button>
+          </div>
+
+          {/* Reset Filters button if any filter is active */}
+          {hasActiveFilters && (
+            <div>
+              <button
+                onClick={handleResetFilters}
+                style={{
+                  width: "auto",
+                  padding: "7px 12px",
+                  fontSize: "12px",
+                  backgroundColor: "#fee2e2",
+                  color: "#991b1b",
+                  border: "1px solid #fca5a5",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                ✕ Reset
+              </button>
+            </div>
+          )}
+        </div>
+
         {expensesLoading ? (
-          <div style={{ padding: "16px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
+          <div style={{ padding: "20px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
             Loading expenses...
           </div>
         ) : expenses.length === 0 ? (
-          <div style={{ padding: "16px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
-            No expenses recorded yet. Click <strong>+ Add Expense</strong> above to add one!
+          <div style={{ padding: "24px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
+            {hasActiveFilters ? (
+              <>
+                No expenses match your search or filter criteria.{" "}
+                <button
+                  onClick={handleResetFilters}
+                  style={{
+                    display: "inline",
+                    width: "auto",
+                    padding: "0",
+                    background: "none",
+                    border: "none",
+                    color: "#2563eb",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    fontSize: "14px",
+                  }}
+                >
+                  Clear filters
+                </button>
+              </>
+            ) : (
+              <>
+                No expenses recorded yet. Click <strong>+ Add Expense</strong> above to add one!
+              </>
+            )}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -475,7 +676,7 @@ export default function GroupDetailPage() {
                 </button>
 
                 <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                  Page {page} of {totalPages}
+                  Page {page} of {totalPages} ({totalExpenses} results)
                 </span>
 
                 <button
