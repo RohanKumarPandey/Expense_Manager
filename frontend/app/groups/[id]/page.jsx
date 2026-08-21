@@ -392,11 +392,42 @@ export default function GroupDetailPage() {
           <div>
             <h2 style={{ fontSize: "18px", margin: 0 }}>Expenses ({totalExpenses})</h2>
           </div>
-          <Link href={`/groups/${id}/add`}>
-            <button style={{ width: "auto", padding: "6px 14px", fontSize: "13px", backgroundColor: "#2563eb" }}>
-              + Add Expense
-            </button>
-          </Link>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <Link href={`/groups/${id}/add-ai`}>
+              <button
+                style={{
+                  width: "auto",
+                  padding: "6px 14px",
+                  fontSize: "13px",
+                  backgroundColor: "#4f46e5",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                ✨ Add with AI
+              </button>
+            </Link>
+            <Link href={`/groups/${id}/add`}>
+              <button
+                style={{
+                  width: "auto",
+                  padding: "6px 14px",
+                  fontSize: "13px",
+                  backgroundColor: "#2563eb",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                + Add Expense
+              </button>
+            </Link>
+          </div>
         </div>
 
         {/* Filter, Search & Sort Toolbar */}
