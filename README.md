@@ -55,7 +55,7 @@ This project was engineered to solve these core issues through clean mathematica
 | **Database** | MongoDB Atlas, Mongoose ODM (Indexes, Schemas, Aggregations) |
 | **Validation** | Zod (Strict Schema Validation & Apportionment Guards) |
 | **Authentication**| JWT (JSON Web Tokens), bcryptjs password hashing |
-| **Testing** | Jest, Supertest (44 Automated Test Suites) |
+| **Testing** | Jest, Supertest (44 automated tests across 4 test suites) |
 | **Deployment** | Vercel (Frontend), Render / Railway (Backend), MongoDB Atlas (Database) |
 
 ---
