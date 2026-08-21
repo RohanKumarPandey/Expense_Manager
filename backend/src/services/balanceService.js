@@ -1,8 +1,5 @@
 const Expense = require("../models/Expense");
-// Settlement model doesn't exist until Milestone 8 — this service is
-// written now to already accept settlements as a parameter, so nothing
-// here needs to change when Settlement is introduced. Only the
-// controller will start passing real data instead of [].
+const Settlement = require("../models/Settlement");
 
 /**
  * Computes each group member's net balance in paise.
@@ -12,11 +9,12 @@ const Expense = require("../models/Expense");
  * Formula per user:
  *   netBalance = (total they PAID across all expenses)
  *              - (total of their SHARE across all expenses' participants)
- *              + (total settlements they SENT)   [0 for now, see above]
- *              - (total settlements they RECEIVED) [0 for now]
+ *              + (total settlements they SENT)
+ *              - (total settlements they RECEIVED)
  */
 const getNetBalances = async (groupId, memberIds = []) => {
   const expenses = await Expense.find({ group: groupId });
+  const settlements = await Settlement.find({ group: groupId });
 
   // start every known member at 0 — this matters so a member with
   // zero activity still shows up with a balance of 0, not "missing"
@@ -35,11 +33,16 @@ const getNetBalances = async (groupId, memberIds = []) => {
     }
   }
 
-  // Settlements will be subtracted/added here starting Milestone 8:
-  // for (const settlement of settlements) {
-  //   balances[settlement.from] += settlement.amount;  // they paid, so their debt shrinks
-  //   balances[settlement.to]   -= settlement.amount;  // they received, so what they're owed shrinks
-  // }
+  // Fold settlements into the balances object.
+  // If X paid Y ₹500 (X = from, Y = to):
+  //   X's debt shrinks -> X's balance moves toward positive -> ADD to X
+  //   Y is owed less now -> Y's balance moves toward negative -> SUBTRACT from Y
+  for (const settlement of settlements) {
+    const fromId = settlement.from.toString();
+    const toId = settlement.to.toString();
+    balances[fromId] = (balances[fromId] || 0) + settlement.amount;
+    balances[toId] = (balances[toId] || 0) - settlement.amount;
+  }
 
   // Safety check: total of all net balances in a closed group must be
   // exactly zero (every rupee paid is owed by someone). If this ever

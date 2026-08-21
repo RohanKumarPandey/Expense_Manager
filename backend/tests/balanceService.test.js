@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 const Expense = require("../src/models/Expense");
+const Settlement = require("../src/models/Settlement");
 const {
   getNetBalances,
   getSuggestedSettlements,
@@ -20,6 +21,7 @@ afterAll(async () => {
 
 afterEach(async () => {
   await Expense.deleteMany({});
+  await Settlement.deleteMany({});
 });
 
 const groupId = new mongoose.Types.ObjectId();
@@ -216,5 +218,210 @@ describe("balanceService.getSuggestedSettlements", () => {
     expect(settlements).toHaveLength(2);
     const totalSettled = settlements.reduce((acc, t) => acc + t.amount, 0);
     expect(totalSettled).toBe(20000); // matches what C is owed
+  });
+});
+
+describe("balanceService with settlements integration", () => {
+  test("full settlement brings pair debt to exactly zero", async () => {
+    // User A paid 10000 (₹100) split equally with User B (5000 each) -> B owes A 5000
+    await Expense.create({
+      group: groupId,
+      paidBy: userA,
+      amount: 10000,
+      description: "Dinner",
+      splitType: "equal",
+      participants: [
+        { user: userA, share: 5000 },
+        { user: userB, share: 5000 },
+      ],
+      createdBy: userA,
+    });
+
+    // User B records settlement of 5000 to User A
+    await Settlement.create({
+      group: groupId,
+      from: userB,
+      to: userA,
+      amount: 5000,
+      recordedBy: userB,
+    });
+
+    const balances = await getNetBalances(groupId, [userA, userB]);
+    expect(balances[userA]).toBe(0);
+    expect(balances[userB]).toBe(0);
+
+    const suggestions = getSuggestedSettlements(balances);
+    expect(suggestions).toEqual([]);
+  });
+
+  test("partial settlement correctly reduces balance and maintains zero-sum invariant", async () => {
+    // User A paid 10000 split equally with User B (5000 each)
+    await Expense.create({
+      group: groupId,
+      paidBy: userA,
+      amount: 10000,
+      description: "Dinner",
+      splitType: "equal",
+      participants: [
+        { user: userA, share: 5000 },
+        { user: userB, share: 5000 },
+      ],
+      createdBy: userA,
+    });
+
+    // User B pays partial settlement of 3000 to User A
+    await Settlement.create({
+      group: groupId,
+      from: userB,
+      to: userA,
+      amount: 3000,
+      recordedBy: userB,
+    });
+
+    const balances = await getNetBalances(groupId, [userA, userB]);
+    // A was owed 5000, received 3000 -> now owed 2000 (+2000)
+    expect(balances[userA]).toBe(2000);
+    // B owed 5000, paid 3000 -> now owes 2000 (-2000)
+    expect(balances[userB]).toBe(-2000);
+
+    const total = Object.values(balances).reduce((acc, v) => acc + v, 0);
+    expect(total).toBe(0);
+
+    const suggestions = getSuggestedSettlements(balances);
+    expect(suggestions).toEqual([
+      { from: userB, to: userA, amount: 2000 },
+    ]);
+  });
+
+  test("multiple expenses and settlements maintain group zero-sum invariant", async () => {
+    // Expense 1: A pays 9000 for A, B, C (3000 each)
+    await Expense.create({
+      group: groupId,
+      paidBy: userA,
+      amount: 9000,
+      description: "Rent Share",
+      splitType: "equal",
+      participants: [
+        { user: userA, share: 3000 },
+        { user: userB, share: 3000 },
+        { user: userC, share: 3000 },
+      ],
+      createdBy: userA,
+    });
+
+    // Expense 2: B pays 6000 for A, B, C (2000 each)
+    await Expense.create({
+      group: groupId,
+      paidBy: userB,
+      amount: 6000,
+      description: "WiFi",
+      splitType: "equal",
+      participants: [
+        { user: userA, share: 2000 },
+        { user: userB, share: 2000 },
+        { user: userC, share: 2000 },
+      ],
+      createdBy: userB,
+    });
+
+    // Settlement 1: C pays A 2000
+    await Settlement.create({
+      group: groupId,
+      from: userC,
+      to: userA,
+      amount: 2000,
+      recordedBy: userC,
+    });
+
+    // Settlement 2: B pays A 1000
+    await Settlement.create({
+      group: groupId,
+      from: userB,
+      to: userA,
+      amount: 1000,
+      recordedBy: userB,
+    });
+
+    const balances = await getNetBalances(groupId, [userA, userB, userC]);
+    // Net without settlements:
+    // A: +9000 - 3000 - 2000 = +4000
+    // B: +6000 - 3000 - 2000 = +1000
+    // C: 0 - 3000 - 2000 = -5000
+    // After settlements:
+    // A received 2000 (from C) + 1000 (from B) = 3000 -> 4000 - 3000 = +1000
+    // B paid 1000 (to A) -> 1000 + 1000 = +2000
+    // C paid 2000 (to A) -> -5000 + 2000 = -3000
+    expect(balances[userA]).toBe(1000);
+    expect(balances[userB]).toBe(2000);
+    expect(balances[userC]).toBe(-3000);
+
+    const total = Object.values(balances).reduce((acc, v) => acc + v, 0);
+    expect(total).toBe(0);
+
+    const suggestions = getSuggestedSettlements(balances);
+    expect(suggestions).toHaveLength(2);
+    // Debtor C (3000) matched with Creditor B (2000) then Creditor A (1000)
+    expect(suggestions).toContainEqual({ from: userC, to: userB, amount: 2000 });
+    expect(suggestions).toContainEqual({ from: userC, to: userA, amount: 1000 });
+  });
+
+  test("settlement recorded by creditor (YOU RECEIVE) correctly zeroes balances", async () => {
+    // User A paid 10000 for A and B -> B owes A 5000 (A is creditor, B is debtor)
+    await Expense.create({
+      group: groupId,
+      paidBy: userA,
+      amount: 10000,
+      description: "Groceries",
+      splitType: "equal",
+      participants: [
+        { user: userA, share: 5000 },
+        { user: userB, share: 5000 },
+      ],
+      createdBy: userA,
+    });
+
+    // Creditor (userA) marks as paid: from is debtor (userB), to is creditor (userA), recordedBy is creditor (userA)
+    await Settlement.create({
+      group: groupId,
+      from: userB,
+      to: userA,
+      amount: 5000,
+      recordedBy: userA,
+    });
+
+    const balances = await getNetBalances(groupId, [userA, userB]);
+    expect(balances[userA]).toBe(0);
+    expect(balances[userB]).toBe(0);
+    expect(getSuggestedSettlements(balances)).toEqual([]);
+  });
+
+  test("settlement recorded by debtor (YOU PAY) correctly zeroes balances", async () => {
+    // User A paid 10000 for A and B -> B owes A 5000
+    await Expense.create({
+      group: groupId,
+      paidBy: userA,
+      amount: 10000,
+      description: "Groceries",
+      splitType: "equal",
+      participants: [
+        { user: userA, share: 5000 },
+        { user: userB, share: 5000 },
+      ],
+      createdBy: userA,
+    });
+
+    // Debtor (userB) marks as paid: from is debtor (userB), to is creditor (userA), recordedBy is debtor (userB)
+    await Settlement.create({
+      group: groupId,
+      from: userB,
+      to: userA,
+      amount: 5000,
+      recordedBy: userB,
+    });
+
+    const balances = await getNetBalances(groupId, [userA, userB]);
+    expect(balances[userA]).toBe(0);
+    expect(balances[userB]).toBe(0);
+    expect(getSuggestedSettlements(balances)).toEqual([]);
   });
 });

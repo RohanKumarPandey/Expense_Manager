@@ -3,6 +3,8 @@ const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
 const generateInviteCode = require("../utils/generateInviteCode");
+const { getNetBalances } = require("../services/balanceService");
+const { toRupees } = require("../utils/money");
 
 // POST /api/groups
 const createGroup = asyncHandler(async (req, res) => {
@@ -75,11 +77,23 @@ const leaveGroup = asyncHandler(async (req, res) => {
   const group = await Group.findById(req.params.id);
   if (!group) throw new ApiError(404, "Group not found");
 
-  // NOTE: balance-zero check will be added in Milestone 6/7 once
-  // balanceService exists. For Milestone 2, leaving is allowed freely —
-  // this is a deliberate placeholder, not an oversight.
+  const memberIds = group.members.map((m) =>
+    (m.user?._id || m.user).toString()
+  );
+  const balances = await getNetBalances(req.params.id, memberIds);
+  const myBalance = balances[req.user.id] || 0;
+
+  if (myBalance !== 0) {
+    throw new ApiError(
+      400,
+      `Cannot leave group with an outstanding balance of ₹${Math.abs(
+        toRupees(myBalance)
+      )}. Settle up first.`
+    );
+  }
+
   group.members = group.members.filter(
-    (m) => m.user.toString() !== req.user.id
+    (m) => (m.user?._id || m.user).toString() !== req.user.id
   );
   await group.save();
 

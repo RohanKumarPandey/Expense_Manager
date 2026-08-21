@@ -13,7 +13,9 @@ export default function SettleUpPage() {
 
   const [group, setGroup] = useState(null);
   const [suggestedSettlements, setSuggestedSettlements] = useState([]);
+  const [settlements, setSettlements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [submittingKey, setSubmittingKey] = useState(null);
   const [error, setError] = useState("");
   const [notification, setNotification] = useState("");
 
@@ -21,13 +23,15 @@ export default function SettleUpPage() {
     try {
       setLoading(true);
       setError("");
-      const [groupRes, balancesRes] = await Promise.all([
+      const [groupRes, balancesRes, settlementsRes] = await Promise.all([
         apiRequest(`/groups/${id}`),
         apiRequest(`/groups/${id}/balances`),
+        apiRequest(`/groups/${id}/settlements`),
       ]);
 
       setGroup(groupRes.data.group);
       setSuggestedSettlements(balancesRes.data.suggestedSettlements || []);
+      setSettlements(settlementsRes.data.settlements || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -43,13 +47,50 @@ export default function SettleUpPage() {
     }
   }, [user, authLoading, id, router, fetchData]);
 
-  const handleMarkAsPaid = (transaction) => {
-    // TODO: wire to settlements endpoint in Milestone 8
-    console.log("Mark as paid clicked for transaction:", transaction);
-    setNotification(
-      `Payment of ₹${transaction.amount.toFixed(2)} recorded locally. (Settlement API will be wired in Milestone 8)`
-    );
-    setTimeout(() => setNotification(""), 4000);
+  const handleMarkAsPaid = async (transaction) => {
+    const key = `${transaction.from}-${transaction.to}`;
+    if (submittingKey) return; // Prevent double click / race condition
+
+    setError("");
+    setNotification("");
+    setSubmittingKey(key);
+
+    try {
+      await apiRequest(`/groups/${id}/settlements`, {
+        method: "POST",
+        body: JSON.stringify({
+          from: transaction.from,
+          to: transaction.to,
+          amount: transaction.amount,
+          note: "Settlement payment",
+        }),
+      });
+
+      const fromName = getUserName(transaction.from);
+      const toName = getUserName(transaction.to);
+      const isSender = transaction.from.toString() === currentUserId;
+      const isReceiver = transaction.to.toString() === currentUserId;
+
+      let msg = `Payment of ₹${transaction.amount.toFixed(2)} between ${fromName} and ${toName} recorded successfully!`;
+      if (isSender) {
+        msg = `Payment of ₹${transaction.amount.toFixed(2)} to ${toName} recorded successfully!`;
+      } else if (isReceiver) {
+        msg = `Payment of ₹${transaction.amount.toFixed(2)} from ${fromName} recorded successfully!`;
+      }
+      setNotification(msg);
+
+      // Refetch both balances and settlement history
+      const [balancesRes, settlementsRes] = await Promise.all([
+        apiRequest(`/groups/${id}/balances`),
+        apiRequest(`/groups/${id}/settlements`),
+      ]);
+      setSuggestedSettlements(balancesRes.data.suggestedSettlements || []);
+      setSettlements(settlementsRes.data.settlements || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmittingKey(null);
+    }
   };
 
   if (authLoading || loading) {
@@ -82,6 +123,7 @@ export default function SettleUpPage() {
       {error && <div className="error-message">{error}</div>}
       {notification && <div className="success-message">{notification}</div>}
 
+      {/* Settle Up Header Card */}
       <div className="card" style={{ marginTop: 0 }}>
         <div style={{ marginBottom: "20px" }}>
           <h1 style={{ fontSize: "24px", marginBottom: "6px" }}>
@@ -143,6 +185,7 @@ export default function SettleUpPage() {
 
               const isUserSender = fromId === currentUserId;
               const isUserReceiver = toId === currentUserId;
+              const isProcessing = submittingKey === `${fromId}-${toId}`;
 
               let cardBg = "#ffffff";
               let borderColor = "#e5e7eb";
@@ -243,20 +286,70 @@ export default function SettleUpPage() {
 
                     <button
                       onClick={() => handleMarkAsPaid(t)}
+                      disabled={isProcessing || Boolean(submittingKey)}
                       style={{
                         width: "auto",
                         padding: "6px 14px",
                         fontSize: "13px",
-                        backgroundColor: "#2563eb",
+                        backgroundColor: isProcessing ? "#9ca3af" : "#2563eb",
                         color: "#ffffff",
                         border: "none",
                         borderRadius: "6px",
                         fontWeight: 500,
-                        cursor: "pointer",
+                        cursor: isProcessing || Boolean(submittingKey) ? "not-allowed" : "pointer",
                       }}
                     >
-                      Mark as Paid
+                      {isProcessing ? "Recording..." : "Mark as Paid"}
                     </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Past Settlements History Section */}
+      <div className="card" style={{ marginTop: "20px" }}>
+        <h2 style={{ fontSize: "18px", margin: "0 0 16px 0" }}>
+          Past Settlements ({settlements.length})
+        </h2>
+
+        {settlements.length === 0 ? (
+          <div style={{ padding: "16px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
+            No settlements recorded yet.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {settlements.map((s) => {
+              const fromName = typeof s.from === "object" ? s.from?.name : "Someone";
+              const toName = typeof s.to === "object" ? s.to?.name : "Someone";
+
+              return (
+                <div
+                  key={s.id || s._id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 14px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    background: "#ffffff",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: "15px", fontWeight: 600, color: "#111827", marginBottom: "2px" }}>
+                      <strong>{fromName}</strong> paid <strong>{toName}</strong>
+                    </div>
+                    <div style={{ fontSize: "13px", color: "#6b7280" }}>
+                      {s.note ? `${s.note} • ` : ""}
+                      {new Date(s.date).toLocaleDateString()} at {new Date(s.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: "#166534" }}>
+                    ₹{s.amount.toFixed(2)}
                   </div>
                 </div>
               );
