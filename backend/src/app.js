@@ -5,6 +5,7 @@ const groupRoutes = require("./routes/groupRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const balanceRoutes = require("./routes/balanceRoutes");
 const settlementRoutes = require("./routes/settlementRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -17,6 +18,7 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/groups/:groupId/expenses", expenseRoutes);
 app.use("/api/groups/:groupId/balances", balanceRoutes);
 app.use("/api/groups/:groupId/settlements", settlementRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 

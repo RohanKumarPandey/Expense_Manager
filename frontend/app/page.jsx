@@ -38,6 +38,9 @@ export default function HomePage() {
       </div>
 
       <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+        <Link href="/dashboard" style={{ flex: 1 }}>
+          <button style={{ width: "100%", backgroundColor: "#059669" }}>📊 View Dashboard</button>
+        </Link>
         <Link href="/groups" style={{ flex: 1 }}>
           <button style={{ width: "100%", backgroundColor: "#2563eb" }}>Manage Groups</button>
         </Link>

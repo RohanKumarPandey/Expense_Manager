@@ -95,7 +95,14 @@ export default function GroupsPage() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <h1 style={{ fontSize: "24px" }}>My Groups</h1>
-        <Link href="/" style={{ color: "#2563eb", fontSize: "14px" }}>← Home</Link>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <Link href="/dashboard" style={{ color: "#059669", fontSize: "14px", textDecoration: "none", fontWeight: 500 }}>
+            📊 Dashboard
+          </Link>
+          <Link href="/" style={{ color: "#2563eb", fontSize: "14px", textDecoration: "none" }}>
+            ← Home
+          </Link>
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
