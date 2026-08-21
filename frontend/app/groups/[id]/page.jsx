@@ -16,6 +16,10 @@ export default function GroupDetailPage() {
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
 
+  // Balances state
+  const [balances, setBalances] = useState([]);
+  const [balancesLoading, setBalancesLoading] = useState(false);
+
   // Expenses state
   const [expenses, setExpenses] = useState([]);
   const [page, setPage] = useState(1);
@@ -32,6 +36,18 @@ export default function GroupDetailPage() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }, [id]);
+
+  const fetchBalances = useCallback(async () => {
+    try {
+      setBalancesLoading(true);
+      const res = await apiRequest(`/groups/${id}/balances`);
+      setBalances(res.data.balances || []);
+    } catch (err) {
+      console.error("Failed to fetch balances:", err.message);
+    } finally {
+      setBalancesLoading(false);
     }
   }, [id]);
 
@@ -56,9 +72,10 @@ export default function GroupDetailPage() {
       router.push("/login");
     } else if (user && id) {
       fetchGroupDetail();
+      fetchBalances();
       fetchExpenses(page);
     }
-  }, [user, authLoading, id, router, page, fetchGroupDetail, fetchExpenses]);
+  }, [user, authLoading, id, router, page, fetchGroupDetail, fetchBalances, fetchExpenses]);
 
   const handleLeaveGroup = async () => {
     if (!confirm("Are you sure you want to leave this group?")) return;
@@ -79,6 +96,7 @@ export default function GroupDetailPage() {
       await apiRequest(`/groups/${id}/members/${userId}`, { method: "DELETE" });
       setActionMessage(`Removed ${userName} from group.`);
       fetchGroupDetail();
+      fetchBalances();
     } catch (err) {
       setError(err.message);
     }
@@ -92,6 +110,7 @@ export default function GroupDetailPage() {
       await apiRequest(`/groups/${id}/expenses/${expenseId}`, { method: "DELETE" });
       setActionMessage(`Expense "${description}" deleted.`);
       fetchExpenses(page);
+      fetchBalances();
     } catch (err) {
       setError(err.message);
     }
@@ -217,6 +236,100 @@ export default function GroupDetailPage() {
             );
           })}
         </div>
+      </div>
+
+      {/* Balances Section */}
+      <div className="card" style={{ marginTop: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <h2 style={{ fontSize: "18px", margin: 0 }}>Group Balances</h2>
+          <Link href={`/groups/${id}/settle`}>
+            <button
+              style={{
+                width: "auto",
+                padding: "6px 14px",
+                fontSize: "13px",
+                backgroundColor: "#059669",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              🤝 Settle Up
+            </button>
+          </Link>
+        </div>
+
+        {balancesLoading ? (
+          <div style={{ padding: "12px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
+            Calculating balances...
+          </div>
+        ) : balances.length === 0 ? (
+          <div style={{ padding: "12px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
+            No balances available.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
+            {balances.map((b) => {
+              const uId = (b.user?._id || b.user?.id || b.user).toString();
+              const memberInfo = group?.members?.find(
+                (m) => (m.user?._id || m.user?.id || m.user).toString() === uId
+              );
+              const userName =
+                typeof b.user === "object" && b.user.name
+                  ? b.user.name
+                  : typeof memberInfo?.user === "object"
+                  ? memberInfo.user.name
+                  : "Member";
+              const isSelf = uId === currentUserId;
+
+              const isOwed = b.netBalance > 0;
+              const owes = b.netBalance < 0;
+              const isSettled = b.netBalance === 0;
+
+              return (
+                <div
+                  key={uId}
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid",
+                    borderColor: isOwed ? "#bbf7d0" : owes ? "#fecaca" : "#e5e7eb",
+                    backgroundColor: isOwed ? "#f0fdf4" : owes ? "#fef2f2" : "#f9fafb",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#1f2937" }}>
+                      {userName} {isSelf && <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 400 }}>(You)</span>}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                    {isOwed && (
+                      <span style={{ fontSize: "15px", fontWeight: 700, color: "#15803d" }}>
+                        is owed ₹{b.netBalance.toFixed(2)}
+                      </span>
+                    )}
+                    {owes && (
+                      <span style={{ fontSize: "15px", fontWeight: 700, color: "#b91c1c" }}>
+                        owes ₹{Math.abs(b.netBalance).toFixed(2)}
+                      </span>
+                    )}
+                    {isSettled && (
+                      <span style={{ fontSize: "14px", fontWeight: 500, color: "#6b7280" }}>
+                        Settled up (₹0.00)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Expenses Section */}
