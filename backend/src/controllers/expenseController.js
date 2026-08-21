@@ -42,13 +42,20 @@ const createExpense = asyncHandler(async (req, res) => {
   }
   const body = parsed.data;
 
-  const memberIds = req.group.members.map((m) => m.user.toString());
+  const memberIds = req.group.members.map((m) =>
+    (m.user?._id || m.user?.id || m.user).toString()
+  );
   const amountInPaise = toPaise(body.amount);
   const participants = buildParticipants(body.splitType, amountInPaise, body, memberIds);
 
+  const paidById = (body.paidBy || req.user.id).toString();
+  if (!memberIds.includes(paidById)) {
+    throw new ApiError(400, "The payer must be a member of this group");
+  }
+
   const expense = await Expense.create({
     group: req.params.groupId,
-    paidBy: req.user.id,
+    paidBy: paidById,
     amount: amountInPaise,
     description: body.description,
     category: body.category || "other",
@@ -183,6 +190,15 @@ const updateExpense = asyncHandler(async (req, res) => {
   // simple fields, editable directly
   if (req.body.description) expense.description = req.body.description;
   if (req.body.category) expense.category = req.body.category;
+  if (req.body.paidBy) {
+    const memberIds = req.group.members.map((m) =>
+      (m.user?._id || m.user?.id || m.user).toString()
+    );
+    if (!memberIds.includes(req.body.paidBy.toString())) {
+      throw new ApiError(400, "The payer must be a member of this group");
+    }
+    expense.paidBy = req.body.paidBy;
+  }
 
   // if amount, splitType, or participant data changed, re-run the
   // whole split calculation rather than trying to patch shares in place

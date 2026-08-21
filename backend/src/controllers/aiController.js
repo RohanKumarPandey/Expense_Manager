@@ -15,7 +15,11 @@ const parseExpense = asyncHandler(async (req, res) => {
   const memberNameToId = {};
   req.group.members.forEach((m) => {
     if (m.user && m.user.name) {
-      memberNameToId[m.user.name.toLowerCase().trim()] = (m.user._id || m.user.id || m.user).toString();
+      memberNameToId[m.user.name.toLowerCase().trim()] = (
+        m.user._id ||
+        m.user.id ||
+        m.user
+      ).toString();
     }
   });
   const memberNames = req.group.members
@@ -23,7 +27,9 @@ const parseExpense = asyncHandler(async (req, res) => {
     .filter(Boolean);
 
   const currentMember = req.group.members.find(
-    (m) => (m.user?._id || m.user?.id || m.user)?.toString() === req.user.id.toString()
+    (m) =>
+      (m.user?._id || m.user?.id || m.user)?.toString() ===
+      req.user.id.toString()
   );
   const currentUserName = currentMember?.user?.name || req.user.name || "Me";
 
@@ -39,8 +45,30 @@ const parseExpense = asyncHandler(async (req, res) => {
     );
   }
 
-  // resolve participant NAMES (from AI) to actual member userIds —
-  // case-insensitive match against real group members
+  // 1. Resolve Payer Name to actual member userId
+  let resolvedPaidById = null;
+  if (result.draft.paidByName) {
+    const cleanedPayer = result.draft.paidByName.toLowerCase().trim();
+    resolvedPaidById = memberNameToId[cleanedPayer];
+
+    if (!resolvedPaidById) {
+      // Payer mentioned is not in the group
+      return res.status(200).json(
+        new ApiResponse(
+          {
+            success: false,
+            reason: `Payer "${result.draft.paidByName}" is not a member of this group`,
+            rawText: text,
+          },
+          "Could not parse expense automatically"
+        )
+      );
+    }
+  } else {
+    resolvedPaidById = req.user.id;
+  }
+
+  // 2. Resolve Participant Names (from AI) to actual member userIds
   const resolvedParticipantIds = [];
   const unresolvedNames = [];
   for (const name of result.draft.participantNames) {
@@ -56,13 +84,14 @@ const parseExpense = asyncHandler(async (req, res) => {
   }
 
   if (unresolvedNames.length > 0) {
-    // AI mentioned someone who isn't actually in this group — treat
-    // exactly like a validation failure, same fallback path
+    // AI mentioned someone who isn't actually in this group
     return res.status(200).json(
       new ApiResponse(
         {
           success: false,
-          reason: `AI mentioned names not in this group: ${unresolvedNames.join(", ")}`,
+          reason: `AI mentioned participants not in this group: ${unresolvedNames.join(
+            ", "
+          )}`,
           rawText: text,
         },
         "Could not parse expense automatically"
@@ -79,6 +108,7 @@ const parseExpense = asyncHandler(async (req, res) => {
           description: result.draft.description,
           category: result.draft.category,
           splitType: result.draft.splitType,
+          paidById: resolvedPaidById,
           participantIds: resolvedParticipantIds,
         },
       },

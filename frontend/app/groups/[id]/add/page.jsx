@@ -22,6 +22,7 @@ export default function AddExpensePage() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("other");
+  const [paidBy, setPaidBy] = useState("");
   const [splitType, setSplitType] = useState("equal"); // "equal" | "unequal" | "percentage"
 
   // Equal split participants
@@ -44,6 +45,8 @@ export default function AddExpensePage() {
         .then((res) => {
           const groupData = res.data.group;
           setGroup(groupData);
+          const currentUid = (user?._id || user?.id || "").toString();
+          setPaidBy(currentUid);
 
           const memberIds = (groupData.members || []).map((m) =>
             typeof m.user === "object" ? m.user._id || m.user.id : m.user
@@ -148,6 +151,7 @@ export default function AddExpensePage() {
       amount: parsedTotalAmount,
       description: description.trim(),
       category,
+      paidBy: paidBy || (user?._id || user?.id),
       splitType,
     };
 
@@ -303,6 +307,35 @@ export default function AddExpensePage() {
               <option value="food">Food</option>
               <option value="travel">Travel</option>
               <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
+              Paid By
+            </label>
+            <select
+              value={paidBy}
+              onChange={(e) => setPaidBy(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+                backgroundColor: "#fff",
+              }}
+            >
+              {group?.members?.map((m) => {
+                const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "Member" };
+                const memberId = (memberUser._id || memberUser.id).toString();
+                const isSelf = memberId === (user?._id || user?.id)?.toString();
+                return (
+                  <option key={memberId} value={memberId}>
+                    {memberUser.name} {isSelf ? "(You)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

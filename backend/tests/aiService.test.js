@@ -248,4 +248,79 @@ describe("aiService — Local Rule-Based NLP Parser", () => {
       expect(result.draft.participantNames).not.toContain("Priya");
     });
   });
+
+  describe("Payer Extraction & Group Membership Safety", () => {
+    test("Identifies another group member as payer in English ('Rohan Pandey paid 1200 for dinner')", () => {
+      const result = parseExpenseLocally(
+        "Rohan Pandey paid 1200 for dinner",
+        ["Rohan", "Rohan Pandey", "Amit"],
+        "Rohan"
+      );
+      expect(result.success).toBe(true);
+      expect(result.draft.amount).toBe(1200);
+      expect(result.draft.description).toBe("Dinner");
+      expect(result.draft.paidByName).toBe("Rohan Pandey");
+      expect(result.draft.participantNames).toEqual(
+        expect.arrayContaining(["Rohan", "Rohan Pandey", "Amit"])
+      );
+    });
+
+    test("Identifies another member as payer ('Amit paid 500 for groceries')", () => {
+      const result = parseExpenseLocally(
+        "Amit paid 500 for groceries",
+        ["Rohan", "Amit"],
+        "Rohan"
+      );
+      expect(result.success).toBe(true);
+      expect(result.draft.amount).toBe(500);
+      expect(result.draft.paidByName).toBe("Amit");
+    });
+
+    test("Identifies logged-in user when 'I paid' is used", () => {
+      const result = parseExpenseLocally(
+        "I paid 1200 for dinner",
+        ["Rohan", "Rohan Pandey", "Amit"],
+        "Rohan"
+      );
+      expect(result.success).toBe(true);
+      expect(result.draft.amount).toBe(1200);
+      expect(result.draft.paidByName).toBe("Rohan");
+    });
+
+    test("Identifies logged-in user when 'Maine ... diye' is used in Hindi", () => {
+      const result = parseExpenseLocally(
+        "Maine 1200 dinner ke diye",
+        ["Rohan", "Rohan Pandey", "Amit"],
+        "Rohan"
+      );
+      expect(result.success).toBe(true);
+      expect(result.draft.amount).toBe(1200);
+      expect(result.draft.paidByName).toBe("Rohan");
+    });
+
+    test("Identifies another member as payer in Hindi/Hinglish with separate split clause", () => {
+      const result = parseExpenseLocally(
+        "Rohan Pandey ne 1200 dinner ke diye aur hum teenon mein baant do",
+        ["Rohan", "Rohan Pandey", "Amit"],
+        "Rohan"
+      );
+      expect(result.success).toBe(true);
+      expect(result.draft.amount).toBe(1200);
+      expect(result.draft.paidByName).toBe("Rohan Pandey");
+      expect(result.draft.participantNames).toEqual(
+        expect.arrayContaining(["Rohan", "Rohan Pandey", "Amit"])
+      );
+      expect(result.draft.participantNames.length).toBe(3);
+    });
+
+    test("Identifies external non-member payer for controller rejection", () => {
+      const result = parseExpenseLocally(
+        "Rahul paid 500 for drinks",
+        ["Rohan", "Amit"],
+        "Rohan"
+      );
+      expect(result.success).toBe(true);
+      expect(result.draft.paidByName).toBe("Rahul");
+    });
+  });
 });

@@ -132,6 +132,27 @@ export default function GroupDetailPage() {
     setPage(1);
   };
 
+  const [deletingGroup, setDeletingGroup] = useState(false);
+
+  const handleDeleteGroup = async () => {
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete the group "${group?.name}"? All associated expenses and settlement records will be permanently removed. This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setError("");
+    setDeletingGroup(true);
+    try {
+      await apiRequest(`/groups/${id}`, { method: "DELETE" });
+      router.push("/groups");
+    } catch (err) {
+      setError(err.message);
+      setDeletingGroup(false);
+    }
+  };
+
   const handleLeaveGroup = async () => {
     if (!confirm("Are you sure you want to leave this group?")) return;
     setError("");
@@ -190,11 +211,13 @@ export default function GroupDetailPage() {
     );
   }
 
-  const currentUserId = user?._id || user?.id;
+  const currentUserId = (user?._id || user?.id || "").toString();
   const currentMember = group?.members?.find(
-    (m) => (m.user?._id || m.user?.id || m.user) === currentUserId
+    (m) => (m.user?._id || m.user?.id || m.user || "").toString() === currentUserId
   );
-  const isAdmin = currentMember?.role === "admin";
+  const isAdmin =
+    currentMember?.role === "admin" ||
+    (group?.createdBy?._id || group?.createdBy?.id || group?.createdBy || "").toString() === currentUserId;
 
   const getCategoryColor = (cat) => {
     switch (cat) {
@@ -217,22 +240,46 @@ export default function GroupDetailPage() {
         </Link>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      <ErrorBanner message={error} />
       {actionMessage && <div className="success-message">{actionMessage}</div>}
 
       {/* Group Header Card */}
       <div className="card" style={{ marginTop: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
           <div>
             <h1 style={{ fontSize: "24px", marginBottom: "4px" }}>{group.name}</h1>
             {group.description && <p style={{ color: "#6b7280", fontSize: "14px" }}>{group.description}</p>}
           </div>
-          <button
-            onClick={handleLeaveGroup}
-            style={{ width: "auto", backgroundColor: "#dc2626", padding: "6px 12px", fontSize: "13px" }}
-          >
-            Leave Group
-          </button>
+
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {isAdmin && (
+              <button
+                onClick={handleDeleteGroup}
+                disabled={deletingGroup}
+                style={{
+                  width: "auto",
+                  backgroundColor: "#dc2626",
+                  padding: "6px 14px",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                }}
+              >
+                {deletingGroup ? "Deleting Group..." : "🗑️ Delete Group"}
+              </button>
+            )}
+            <button
+              onClick={handleLeaveGroup}
+              style={{
+                width: "auto",
+                backgroundColor: isAdmin ? "#4b5563" : "#dc2626",
+                padding: "6px 14px",
+                fontSize: "13px",
+                fontWeight: 500,
+              }}
+            >
+              Leave Group
+            </button>
+          </div>
         </div>
 
         <div style={{ background: "#f3f4f6", padding: "12px", borderRadius: "6px", marginTop: "16px" }}>

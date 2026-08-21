@@ -29,6 +29,7 @@ export default function AddExpenseAIPage() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("other");
+  const [paidBy, setPaidBy] = useState("");
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -43,8 +44,10 @@ export default function AddExpenseAIPage() {
         .then((res) => {
           const groupData = res.data.group;
           setGroup(groupData);
+          const currentUid = (user?._id || user?.id || "").toString();
+          setPaidBy(currentUid);
           const allMemberIds = (groupData.members || []).map((m) =>
-            typeof m.user === "object" ? m.user._id || m.user.id : m.user
+            (typeof m.user === "object" ? m.user._id || m.user.id : m.user).toString()
           );
           setSelectedParticipants(allMemberIds);
         })
@@ -86,11 +89,14 @@ export default function AddExpenseAIPage() {
         setAmount(draft.amount.toString());
         setDescription(draft.description);
         setCategory(draft.category || "other");
+        if (draft.paidById) {
+          setPaidBy(draft.paidById);
+        }
         setSelectedParticipants(
           draft.participantIds && draft.participantIds.length > 0
             ? draft.participantIds
             : group?.members?.map((m) =>
-                typeof m.user === "object" ? m.user._id || m.user.id : m.user
+                (typeof m.user === "object" ? m.user._id || m.user.id : m.user).toString()
               ) || []
         );
         setViewMode("draft");
@@ -102,6 +108,7 @@ export default function AddExpenseAIPage() {
         setDescription(promptText.trim());
         setAmount("");
         setCategory("other");
+        setPaidBy((user?._id || user?.id || "").toString());
         setViewMode("fallback");
       }
     } catch (err) {
@@ -122,7 +129,7 @@ export default function AddExpenseAIPage() {
   const handleSelectAllParticipants = () => {
     if (!group?.members) return;
     const allIds = group.members.map((m) =>
-      typeof m.user === "object" ? m.user._id || m.user.id : m.user
+      (typeof m.user === "object" ? m.user._id || m.user.id : m.user).toString()
     );
     setSelectedParticipants(allIds);
   };
@@ -156,6 +163,7 @@ export default function AddExpenseAIPage() {
           description: description.trim(),
           category,
           splitType: "equal",
+          paidBy: paidBy || (user?._id || user?.id),
           participantIds: selectedParticipants,
           source: viewMode === "draft" ? "ai" : "manual",
         }),
@@ -168,11 +176,12 @@ export default function AddExpenseAIPage() {
     }
   };
 
-  const handleDiscard = () => {
+  const handleResetPrompt = () => {
     setViewMode("prompt");
     setAmount("");
     setDescription("");
     setCategory("other");
+    setPaidBy((user?._id || user?.id || "").toString());
     setError("");
     setParseNotice("");
   };
@@ -208,43 +217,44 @@ export default function AddExpenseAIPage() {
       </div>
 
       <div className="card" style={{ marginTop: 0 }}>
-        <div style={{ marginBottom: "18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-            <span style={{ fontSize: "24px" }}>🤖</span>
-            <h1 style={{ fontSize: "22px", margin: 0 }}>Add Expense with AI</h1>
-          </div>
-          <p style={{ color: "#6b7280", fontSize: "14px", margin: 0 }}>
-            Describe your expense in natural language. Our AI will draft the details for your review before saving.
-          </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <h1 style={{ fontSize: "22px", margin: 0 }}>
+            ✨ Natural-Language Expense Entry
+          </h1>
+          <span
+            style={{
+              fontSize: "12px",
+              padding: "3px 8px",
+              background: "#dbeafe",
+              color: "#1e40af",
+              borderRadius: "12px",
+              fontWeight: 600,
+            }}
+          >
+            AI Drafted
+          </span>
         </div>
 
         {error && <div className="error-message">{error}</div>}
 
-        {/* View Mode 1: Natural Language Prompt Input */}
+        {/* View Mode 1: AI Prompt Input */}
         {viewMode === "prompt" && (
           <div>
+            <p style={{ fontSize: "14px", color: "#4b5563", marginBottom: "16px" }}>
+              Type an expense naturally in plain English, Hindi, or Hinglish.
+              We'll extract the amount, category, payer, and split participants into an editable draft.
+            </p>
+
             <form onSubmit={handleParseAI}>
-              <div style={{ marginBottom: "14px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    marginBottom: "6px",
-                    color: "#374151",
-                  }}
-                >
-                  Describe the expense:
-                </label>
+              <div style={{ marginBottom: "12px" }}>
                 <textarea
                   rows={3}
-                  required
-                  placeholder="e.g. Paid ₹1200 for groceries and snacks at supermarket for everyone"
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
+                  placeholder='e.g., "Rohan Pandey paid 1200 for dinner" or "Maine 600 rupaye snacks ke bhare"'
                   style={{
                     width: "100%",
-                    padding: "10px 12px",
+                    padding: "12px",
                     borderRadius: "6px",
                     border: "1px solid #d1d5db",
                     fontSize: "14px",
@@ -379,7 +389,7 @@ export default function AddExpenseAIPage() {
                 />
               </div>
 
-              <div style={{ marginBottom: "16px" }}>
+              <div style={{ marginBottom: "14px" }}>
                 <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
                   Category
                 </label>
@@ -401,6 +411,36 @@ export default function AddExpenseAIPage() {
                   <option value="food">Food</option>
                   <option value="travel">Travel</option>
                   <option value="other">Other</option>
+                </select>
+              </div>
+
+              {/* Paid By Selector */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
+                  Paid By
+                </label>
+                <select
+                  value={paidBy}
+                  onChange={(e) => setPaidBy(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #d1d5db",
+                    fontSize: "14px",
+                    backgroundColor: "#fff",
+                  }}
+                >
+                  {group?.members?.map((m) => {
+                    const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "Member" };
+                    const memberId = (memberUser._id || memberUser.id).toString();
+                    const isSelf = memberId === (user?._id || user?.id)?.toString();
+                    return (
+                      <option key={memberId} value={memberId}>
+                        {memberUser.name} {isSelf ? "(You)" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -439,7 +479,7 @@ export default function AddExpenseAIPage() {
                 >
                   {group?.members?.map((m) => {
                     const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "User" };
-                    const memberId = memberUser._id || memberUser.id;
+                    const memberId = (memberUser._id || memberUser.id).toString();
                     const isChecked = selectedParticipants.includes(memberId);
 
                     return (
@@ -461,7 +501,7 @@ export default function AddExpenseAIPage() {
                         />
                         <span>
                           {memberUser.name}{" "}
-                          {memberId === (user?._id || user?.id) && (
+                          {memberId === (user?._id || user?.id)?.toString() && (
                             <span style={{ color: "#2563eb", fontSize: "12px" }}>(You)</span>
                           )}
                         </span>
@@ -478,22 +518,15 @@ export default function AddExpenseAIPage() {
                   disabled={saving || !parseFloat(amount) || selectedParticipants.length === 0}
                   style={{
                     flex: 2,
-                    backgroundColor:
-                      saving || !parseFloat(amount) || selectedParticipants.length === 0
-                        ? "#93c5fd"
-                        : "#2563eb",
-                    cursor:
-                      saving || !parseFloat(amount) || selectedParticipants.length === 0
-                        ? "not-allowed"
-                        : "pointer",
+                    backgroundColor: saving ? "#93c5fd" : "#059669",
                     fontWeight: 600,
                   }}
                 >
-                  {saving ? "Saving Expense..." : "Confirm & Save Expense"}
+                  {saving ? "Saving Expense..." : "✓ Confirm & Save"}
                 </button>
                 <button
                   type="button"
-                  onClick={handleDiscard}
+                  onClick={handleResetPrompt}
                   style={{
                     flex: 1,
                     backgroundColor: "#f3f4f6",
@@ -501,7 +534,7 @@ export default function AddExpenseAIPage() {
                     border: "1px solid #d1d5db",
                   }}
                 >
-                  Discard
+                  ↻ Re-try Prompt
                 </button>
               </div>
             </form>

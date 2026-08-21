@@ -10,8 +10,7 @@ const aiExpenseSchema = z.object({
     .enum(["rent", "groceries", "utilities", "food", "travel", "other"])
     .default("other"),
   splitType: z.enum(["equal"]).default("equal"),
-  // NOTE: MVP only supports AI-driven "equal" splits. Unequal/percentage
-  // via natural language is deliberately out of scope here.
+  paidByName: z.string().min(1).optional(),
   participantNames: z.array(z.string().min(1)).min(1),
 });
 

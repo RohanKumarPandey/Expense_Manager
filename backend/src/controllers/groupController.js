@@ -1,4 +1,6 @@
 const Group = require("../models/Group");
+const Expense = require("../models/Expense");
+const Settlement = require("../models/Settlement");
 const ApiError = require("../utils/ApiError");
 const ApiResponse = require("../utils/ApiResponse");
 const asyncHandler = require("../utils/asyncHandler");
@@ -62,7 +64,7 @@ const joinGroup = asyncHandler(async (req, res) => {
   if (!group) throw new ApiError(404, "Invalid invite code");
 
   const alreadyMember = group.members.some(
-    (m) => m.user.toString() === req.user.id
+    (m) => (m.user?._id || m.user).toString() === req.user.id.toString()
   );
   if (alreadyMember) throw new ApiError(409, "You are already a member of this group");
 
@@ -76,6 +78,24 @@ const joinGroup = asyncHandler(async (req, res) => {
 const leaveGroup = asyncHandler(async (req, res) => {
   const group = await Group.findById(req.params.id);
   if (!group) throw new ApiError(404, "Group not found");
+
+  const currentMember = group.members.find(
+    (m) => (m.user?._id || m.user).toString() === req.user.id.toString()
+  );
+  if (!currentMember) throw new ApiError(403, "You are not a member of this group");
+
+  // Admin edge case: Sole admin cannot abandon a group that still has other members
+  const otherAdmins = group.members.filter(
+    (m) =>
+      m.role === "admin" &&
+      (m.user?._id || m.user).toString() !== req.user.id.toString()
+  );
+  if (currentMember.role === "admin" && otherAdmins.length === 0 && group.members.length > 1) {
+    throw new ApiError(
+      400,
+      "Cannot leave group as the sole admin while other members remain. Assign another admin or delete the group."
+    );
+  }
 
   const memberIds = group.members.map((m) =>
     (m.user?._id || m.user).toString()
@@ -93,11 +113,43 @@ const leaveGroup = asyncHandler(async (req, res) => {
   }
 
   group.members = group.members.filter(
-    (m) => (m.user?._id || m.user).toString() !== req.user.id
+    (m) => (m.user?._id || m.user).toString() !== req.user.id.toString()
   );
-  await group.save();
+
+  // If the last member leaves, delete the group and related data
+  if (group.members.length === 0) {
+    await Expense.deleteMany({ group: req.params.id });
+    await Settlement.deleteMany({ group: req.params.id });
+    await Group.findByIdAndDelete(req.params.id);
+  } else {
+    await group.save();
+  }
 
   res.status(200).json(new ApiResponse(null, "Left group successfully"));
+});
+
+// DELETE /api/groups/:id  (admin only)
+const deleteGroup = asyncHandler(async (req, res) => {
+  const group = await Group.findById(req.params.id);
+  if (!group) throw new ApiError(404, "Group not found");
+
+  const currentMember = group.members.find(
+    (m) => (m.user?._id || m.user).toString() === req.user.id.toString()
+  );
+  if (!currentMember || currentMember.role !== "admin") {
+    throw new ApiError(403, "Only group admins can delete the group");
+  }
+
+  // Delete all associated expenses and settlements
+  await Expense.deleteMany({ group: req.params.id });
+  await Settlement.deleteMany({ group: req.params.id });
+
+  // Delete the group itself
+  await Group.findByIdAndDelete(req.params.id);
+
+  res.status(200).json(
+    new ApiResponse(null, "Group and associated data deleted successfully")
+  );
 });
 
 // DELETE /api/groups/:id/members/:userId  (admin only)
@@ -106,12 +158,12 @@ const removeMember = asyncHandler(async (req, res) => {
   if (!group) throw new ApiError(404, "Group not found");
 
   const targetIsMember = group.members.some(
-    (m) => m.user.toString() === req.params.userId
+    (m) => (m.user?._id || m.user).toString() === req.params.userId
   );
   if (!targetIsMember) throw new ApiError(404, "User is not a member of this group");
 
   group.members = group.members.filter(
-    (m) => m.user.toString() !== req.params.userId
+    (m) => (m.user?._id || m.user).toString() !== req.params.userId
   );
   await group.save();
 
@@ -124,5 +176,6 @@ module.exports = {
   getGroupById,
   joinGroup,
   leaveGroup,
+  deleteGroup,
   removeMember,
 };

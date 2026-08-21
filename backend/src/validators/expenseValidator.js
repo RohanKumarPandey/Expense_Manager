@@ -4,6 +4,7 @@ const baseFields = {
   amount: z.number().positive("Amount must be greater than zero"),
   description: z.string().min(1, "Description is required"),
   category: z.enum(["rent", "groceries", "utilities", "food", "travel", "other"]).optional(),
+  paidBy: z.string().optional(),
 };
 
 const equalSplitSchema = z.object({

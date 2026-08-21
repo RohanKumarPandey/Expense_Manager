@@ -87,7 +87,7 @@ const extractCleanDescription = (cleanText, category, memberNames = []) => {
 
   // 7. Strip leftover prepositions & grammatical particles (English & Hindi)
   cleaned = cleaned.replace(
-    /\b(for|on|with|and|of|the|a|an|split|equally|between|among|par|ka|ke|ki|mein|ko|se|aur|liye|saath|beech)\b/gi,
+    /\b(for|on|with|and|of|the|a|an|split|equally|between|among|par|ka|ke|ki|mein|ko|se|aur|liye|saath|beech|ne)\b/gi,
     " "
   );
 
@@ -109,7 +109,7 @@ const extractCleanDescription = (cleanText, category, memberNames = []) => {
 /**
  * Intelligent local rule-based NLP parser.
  * Runs 100% offline with zero API keys or external costs, extracting
- * amounts, categories, clean descriptions, and participant matching.
+ * amounts, categories, clean descriptions, payers, and participant matching.
  */
 const parseExpenseLocally = (text, memberNames = [], currentUserName = "") => {
   if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -120,7 +120,6 @@ const parseExpenseLocally = (text, memberNames = [], currentUserName = "") => {
   const lower = cleanText.toLowerCase();
 
   // 1. Validate Expense Intent / Context
-  // Must contain spending verbs, currency markers, or explicit expense items (not generic words like 'room')
   const spendingVerbsRegex =
     /\b(paid|pay|spent|spend|kharch|diye|diya|de\s*diye|kharida|bought|buy|bhara|bhar\s*diya|bill|cost|price|rupaye|rupayee|rupees|rs|inr|₹|amount|expense|split|baant|baanto|baat|dono\s*mein|sabke\s*beech)\b/i;
   const explicitExpenseItemsRegex =
@@ -138,7 +137,6 @@ const parseExpenseLocally = (text, memberNames = [], currentUserName = "") => {
   }
 
   // 2. Amount Extraction & Conflict Detection
-  // Extract explicit currency / spending numbers
   const explicitCurrencyMatches = [];
   const currencyRegex = /(?:₹|rs\.?|inr)\s*(\d+(?:\.\d{1,2})?)/gi;
   let m;
@@ -174,19 +172,15 @@ const parseExpenseLocally = (text, memberNames = [], currentUserName = "") => {
 
   for (const num of allNumbersWithIndex) {
     if (num.val >= 1000000000) {
-      // Obvious phone number or timestamp
       continue;
     }
 
     const beforeSlice = cleanText.slice(Math.max(0, num.index - 15), num.index);
     const afterSlice = cleanText.slice(num.index + num.match.length, num.index + num.match.length + 20);
 
-    // Is quantity before noun? e.g. "2 pizzas"
     const isQuantity = /^\s*(?:pizzas?|burgers?|people|persons?|members?|items?|tickets?|bottles?|plates?|beers?|cups?)\b/i.test(
       afterSlice
     );
-
-    // Is identifier after tag? e.g. "flat 102", "room 404", "table 3"
     const isIdentifier = /\b(?:flat|room|table|apt|packet|shop)\s*#?\s*$/i.test(beforeSlice);
 
     if (!isQuantity && !isIdentifier) {
@@ -258,10 +252,73 @@ const parseExpenseLocally = (text, memberNames = [], currentUserName = "") => {
   // 4. Description Extraction
   const desc = extractCleanDescription(cleanText, category, memberNames);
 
-  // 5. Participant Resolution (English & Hindi/Hinglish)
-  // Universal group references: "sabke beech", "sab log", "everyone", "all"
+  // 5. Payer Identification
+  // Sort member names by length descending so longer matching names (e.g. "Rohan Pandey") match before shorter substrings ("Rohan")
+  const sortedMembers = [...memberNames].sort((a, b) => b.length - a.length);
+
+  let paidByName = "";
+
+  // Check for explicit member payer patterns: "<Member> paid", "<Member> ne", "paid by <Member>", "by <Member>"
+  for (const name of sortedMembers) {
+    if (!name || name.trim().length === 0) continue;
+    const escaped = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    // Pattern A: "<Name> paid / spent / bought / gave / covered / ne ... / kharch ..."
+    const memberPaidRegex = new RegExp(
+      `\\b${escaped}\\s+(?:paid|pay|spent|spend|bought|buy|gave|give|covered|cover|ne\\b|kharch\\s*kiye|kharch\\s*kiya|diye|diya|bhare|bhara)\\b`,
+      "i"
+    );
+    // Pattern B: "paid by <Name>", "covered by <Name>", "by <Name>"
+    const paidByMemberRegex = new RegExp(
+      `(?:paid\\s+by|covered\\s+by|by|diye|bhare|de\\s*diye)\\s+${escaped}\\b`,
+      "i"
+    );
+
+    if (memberPaidRegex.test(cleanText) || paidByMemberRegex.test(cleanText)) {
+      paidByName = name;
+      break;
+    }
+  }
+
+  // Check for self-paying indicators if no group member was explicitly identified as paying
+  if (!paidByName) {
+    const isSelfPaid =
+      /\b(maine|humne|i\s+paid|i\s+spent|i\s+bought|i\s+gave|i\s+covered|paid\s+by\s+me|my\s+treat|spent\s+by\s+me)\b/i.test(
+        cleanText
+      );
+    if (isSelfPaid && currentUserName) {
+      paidByName = currentUserName;
+    }
+  }
+
+  // Check if an external / non-member name is explicitly marked as paying:
+  // e.g. "Rahul paid 500", "John ne 1200 diye"
+  if (!paidByName) {
+    const externalPayerMatch = cleanText.match(
+      /^\s*([a-zA-Z]+(?:\s+[a-zA-Z]+)?)\s+(?:paid|spent|bought|covered|ne\b|kharch\s*kiye|diye|bhare)\b/i
+    );
+    if (externalPayerMatch) {
+      const candidateName = externalPayerMatch[1].trim();
+      const lowerCand = candidateName.toLowerCase();
+      const ignoredPronouns = [
+        "i", "we", "he", "she", "they", "it", "maine", "humne", "hum", "someone", "who",
+        "monthly", "daily", "flat", "room", "total", "today", "yesterday"
+      ];
+      if (!ignoredPronouns.includes(lowerCand)) {
+        paidByName = candidateName;
+      }
+    }
+  }
+
+  // If still not identified, default to current logged in user (or first member)
+  if (!paidByName) {
+    paidByName = currentUserName || (memberNames.length > 0 ? memberNames[0] : "Me");
+  }
+
+  // 6. Participant Resolution (English & Hindi/Hinglish)
+  // Universal group references: "sabke beech", "sab log", "everyone", "all", "hum teenon", "hum charon"
   const isEveryone =
-    /\b(sabke\s*beech|sab\s*log|sab\s*mein|sabko|sab\s*ke|everyone|all|everybody|flatmates|whole\s*group|all\s*of\s*us)\b/i.test(
+    /\b(sabke\s*beech|sab\s*log|sab\s*mein|sabko|sab\s*ke|everyone|all|everybody|flatmates|whole\s*group|all\s*of\s*us|hum\s*teenon|hum\s*charon|hum\s*panchon|teenon\s*mein|charon\s*mein)\b/i.test(
       lower
     );
 
@@ -272,17 +329,24 @@ const parseExpenseLocally = (text, memberNames = [], currentUserName = "") => {
       lower
     );
 
-  // Check which members are explicitly named in the text (case-insensitive)
+  // Check which members are explicitly named in the text (longest first, avoiding overlapping sub-matches)
   const explicitlyMentionedMembers = [];
-  memberNames.forEach((name) => {
-    if (name && name.trim().length > 0) {
-      const escaped = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const nameRegex = new RegExp(`\\b${escaped}\\b`, "i");
-      if (nameRegex.test(cleanText)) {
-        explicitlyMentionedMembers.push(name);
-      }
+  let remainingTextForNames = cleanText;
+
+  for (const name of sortedMembers) {
+    if (!name || name.trim().length === 0) continue;
+    const escaped = name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const nameRegex = new RegExp(`\\b${escaped}\\b`, "i");
+    if (nameRegex.test(remainingTextForNames)) {
+      explicitlyMentionedMembers.push(name);
+      remainingTextForNames = remainingTextForNames.replace(nameRegex, " ___ ");
     }
-  });
+  }
+
+  const hasExplicitSplitClause =
+    /\b(split|between|with|sharing|ke\s*saath|ke\s*beech|mein\s*baant|baant\s*do|baant\s*lo|dono\s*mein|teenon\s*mein|sabke\s*beech|everyone|all)\b/i.test(
+      lower
+    );
 
   let participantNames = [];
 
@@ -290,6 +354,15 @@ const parseExpenseLocally = (text, memberNames = [], currentUserName = "") => {
     // Select all members
     participantNames =
       memberNames.length > 0 ? memberNames : [currentUserName || "Member"];
+  } else if (
+    explicitlyMentionedMembers.length === 1 &&
+    explicitlyMentionedMembers[0].toLowerCase() === paidByName.toLowerCase() &&
+    !hasExplicitSplitClause
+  ) {
+    // If only the payer's name is mentioned in the text without an explicit split clause (e.g. "Rohan Pandey paid 1200 for dinner")
+    // the expense splits across the entire household
+    participantNames =
+      memberNames.length > 0 ? memberNames : [paidByName];
   } else if (explicitlyMentionedMembers.length > 0) {
     participantNames = [...explicitlyMentionedMembers];
     // If self reference or relational preposition ("with X", "X ke saath", "hum dono") is present, ensure current user is included
@@ -320,6 +393,7 @@ const parseExpenseLocally = (text, memberNames = [], currentUserName = "") => {
     description: desc,
     category,
     splitType: "equal",
+    paidByName,
     participantNames,
   };
 
@@ -344,7 +418,7 @@ You are a strict JSON parser for an expense-splitting app. Given a user's
 free-text description of an expense (in English, Hindi, or Hinglish), output ONLY a single JSON object —
 no prose, no markdown code fences, no explanation.
 
-The current user is: ${currentUserName || "the logged-in user"}.
+The logged-in user entering this request is: ${currentUserName || "the logged-in user"}.
 The group's members are: ${memberNames.join(", ")}.
 
 Output schema:
@@ -353,7 +427,8 @@ Output schema:
   "description": <string, a concise label for the expense, e.g. "Dinner", "Groceries", "WiFi Bill">,
   "category": <one of: "rent","groceries","utilities","food","travel","other">,
   "splitType": "equal",
-  "participantNames": [<array of member names involved, using EXACT names from the member list above. If the user says "hum dono", "mere saath", "with X", include BOTH the current user and X. If the user says "everyone" or "sabke beech", include ALL members.>]
+  "paidByName": <string, EXACT name of who paid from the group members list. If the text mentions another member paid (e.g. "Amit paid 500" or "Rohan Pandey ne 1200 diye"), set paidByName to that member. If the user says "I paid" or "Maine diye", set paidByName to "${currentUserName}". If unspecified, default to "${currentUserName}">,
+  "participantNames": [<array of member names involved, using EXACT names from the member list above. If the user says "hum dono", "mere saath", "with X", include BOTH the current user and X. If the user says "everyone", "sabke beech", or only mentions the payer without a split clause, include ALL members.>]
 }
 `.trim();
 
