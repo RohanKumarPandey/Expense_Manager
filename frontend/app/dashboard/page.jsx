@@ -6,6 +6,9 @@ import { apiRequest } from "../../lib/apiClient";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import ErrorBanner from "../../components/ErrorBanner";
+import EmptyState from "../../components/EmptyState";
 
 const CategoryPieChart = dynamic(
   () => import("../../components/CategoryPieChart"),
@@ -79,7 +82,22 @@ export default function DashboardPage() {
   }, [user, authLoading, router, fetchDashboard]);
 
   if (authLoading || loading) {
-    return <div className="card">Loading cross-group dashboard...</div>;
+    return (
+      <div className="card">
+        <LoadingSpinner label="Aggregating household financial data..." />
+      </div>
+    );
+  }
+
+  if (error && !dashboardData) {
+    return (
+      <div className="card">
+        <ErrorBanner message={error} onRetry={fetchDashboard} />
+        <Link href="/groups" style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
+          ← Back to Groups
+        </Link>
+      </div>
+    );
   }
 
   const {
@@ -233,9 +251,18 @@ export default function DashboardPage() {
         </h2>
 
         {groupsSummary.length === 0 ? (
-          <div style={{ color: "#6b7280", fontSize: "14px" }}>
-            You haven't joined any groups yet. <Link href="/groups" style={{ color: "#2563eb" }}>Join or create a group</Link> to get started.
-          </div>
+          <EmptyState
+            icon="👥"
+            title="No group balances yet"
+            description="Join or create a flatmate group to see your aggregated financial standing."
+            action={
+              <Link href="/groups">
+                <button style={{ width: "auto", padding: "8px 16px", fontSize: "13px" }}>
+                  Create or Join Group
+                </button>
+              </Link>
+            }
+          />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
             {groupsSummary.map((g) => {

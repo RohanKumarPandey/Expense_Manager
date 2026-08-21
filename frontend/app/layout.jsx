@@ -3,7 +3,12 @@ import "./globals.css";
 
 export const metadata = {
   title: "Flatmate Expense Manager",
-  description: "Manage shared expenses with your flatmates easily.",
+  description: "Smart, debt-simplified expense splitting for roommates and flatmates.",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }) {
@@ -11,7 +16,14 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <AuthProvider>
-          <main style={{ maxWidth: "850px", margin: "40px auto", padding: "0 20px" }}>
+          <main
+            style={{
+              maxWidth: "880px",
+              width: "100%",
+              margin: "24px auto",
+              padding: "0 16px",
+            }}
+          >
             {children}
           </main>
         </AuthProvider>

@@ -5,6 +5,8 @@ import { useAuth } from "../../../../lib/authContext";
 import { apiRequest } from "../../../../lib/apiClient";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import ErrorBanner from "../../../../components/ErrorBanner";
 
 export default function SettleUpPage() {
   const { id } = useParams();
@@ -68,15 +70,7 @@ export default function SettleUpPage() {
 
       const fromName = getUserName(transaction.from);
       const toName = getUserName(transaction.to);
-      const isSender = transaction.from.toString() === currentUserId;
-      const isReceiver = transaction.to.toString() === currentUserId;
-
-      let msg = `Payment of ₹${transaction.amount.toFixed(2)} between ${fromName} and ${toName} recorded successfully!`;
-      if (isSender) {
-        msg = `Payment of ₹${transaction.amount.toFixed(2)} to ${toName} recorded successfully!`;
-      } else if (isReceiver) {
-        msg = `Payment of ₹${transaction.amount.toFixed(2)} from ${fromName} recorded successfully!`;
-      }
+      const msg = `Successfully recorded ₹${transaction.amount.toFixed(2)} payment from ${fromName} to ${toName}.`;
       setNotification(msg);
 
       // Refetch both balances and settlement history
@@ -94,7 +88,22 @@ export default function SettleUpPage() {
   };
 
   if (authLoading || loading) {
-    return <div className="card">Loading settlement details...</div>;
+    return (
+      <div className="card">
+        <LoadingSpinner label="Calculating debt simplification payments..." />
+      </div>
+    );
+  }
+
+  if (error && !group) {
+    return (
+      <div className="card">
+        <ErrorBanner message={error} onRetry={fetchData} />
+        <Link href={`/groups/${id}`} style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
+          ← Back to Group
+        </Link>
+      </div>
+    );
   }
 
   const currentUserId = (user?._id || user?.id || "").toString();

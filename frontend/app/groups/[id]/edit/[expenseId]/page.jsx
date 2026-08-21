@@ -5,6 +5,8 @@ import { useAuth } from "../../../../../lib/authContext";
 import { apiRequest } from "../../../../../lib/apiClient";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import LoadingSpinner from "../../../../../components/LoadingSpinner";
+import ErrorBanner from "../../../../../components/ErrorBanner";
 
 export default function EditExpensePage() {
   const { id, expenseId } = useParams();
@@ -247,14 +249,20 @@ export default function EditExpensePage() {
   };
 
   if (authLoading || loading) {
-    return <div className="card">Loading expense details...</div>;
+    return (
+      <div className="card">
+        <LoadingSpinner label="Loading expense details..." />
+      </div>
+    );
   }
 
   if (error && !expense) {
     return (
       <div className="card">
-        <div className="error-message">{error}</div>
-        <Link href={`/groups/${id}`} style={{ color: "#2563eb" }}>← Back to Group</Link>
+        <ErrorBanner message={error} onRetry={() => router.refresh()} />
+        <Link href={`/groups/${id}`} style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
+          ← Back to Group
+        </Link>
       </div>
     );
   }

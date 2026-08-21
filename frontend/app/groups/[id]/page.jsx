@@ -5,6 +5,9 @@ import { useAuth } from "../../../lib/authContext";
 import { apiRequest } from "../../../lib/apiClient";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import ErrorBanner from "../../../components/ErrorBanner";
+import EmptyState from "../../../components/EmptyState";
 
 export default function GroupDetailPage() {
   const { id } = useParams();
@@ -169,14 +172,20 @@ export default function GroupDetailPage() {
   };
 
   if (authLoading || loading) {
-    return <div className="card">Loading group detail...</div>;
+    return (
+      <div className="card">
+        <LoadingSpinner label="Loading group details..." />
+      </div>
+    );
   }
 
   if (error && !group) {
     return (
       <div className="card">
-        <div className="error-message">{error}</div>
-        <Link href="/groups" style={{ color: "#2563eb" }}>← Back to Groups</Link>
+        <ErrorBanner message={error} onRetry={fetchGroupDetail} />
+        <Link href="/groups" style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
+          ← Back to Groups
+        </Link>
       </div>
     );
   }
@@ -316,13 +325,13 @@ export default function GroupDetailPage() {
         </div>
 
         {balancesLoading ? (
-          <div style={{ padding: "12px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
-            Calculating balances...
-          </div>
+          <LoadingSpinner label="Calculating group balances..." />
         ) : balances.length === 0 ? (
-          <div style={{ padding: "12px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
-            No balances available.
-          </div>
+          <EmptyState
+            icon="⚖️"
+            title="No balance history yet"
+            description="Add your first group expense above to calculate who owes whom."
+          />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
             {balances.map((b) => {
@@ -554,37 +563,48 @@ export default function GroupDetailPage() {
         </div>
 
         {expensesLoading ? (
-          <div style={{ padding: "20px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
-            Loading expenses...
-          </div>
+          <LoadingSpinner label="Fetching expenses..." />
         ) : expenses.length === 0 ? (
-          <div style={{ padding: "24px 0", color: "#6b7280", fontSize: "14px", textAlign: "center" }}>
-            {hasActiveFilters ? (
-              <>
-                No expenses match your search or filter criteria.{" "}
+          hasActiveFilters ? (
+            <EmptyState
+              icon="🔍"
+              title="No expenses match your filters"
+              description="Try adjusting your search term, category, or date range."
+              action={
                 <button
                   onClick={handleResetFilters}
                   style={{
-                    display: "inline",
                     width: "auto",
-                    padding: "0",
-                    background: "none",
-                    border: "none",
-                    color: "#2563eb",
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    fontSize: "14px",
+                    padding: "8px 16px",
+                    backgroundColor: "#2563eb",
+                    fontSize: "13px",
                   }}
                 >
-                  Clear filters
+                  Clear Filters
                 </button>
-              </>
-            ) : (
-              <>
-                No expenses recorded yet. Click <strong>+ Add Expense</strong> above to add one!
-              </>
-            )}
-          </div>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon="🧾"
+              title="No expenses recorded yet"
+              description="Get started by recording the first expense for your group!"
+              action={
+                <Link href={`/groups/${id}/add`}>
+                  <button
+                    style={{
+                      width: "auto",
+                      padding: "8px 16px",
+                      backgroundColor: "#2563eb",
+                      fontSize: "13px",
+                    }}
+                  >
+                    + Add First Expense
+                  </button>
+                </Link>
+              }
+            />
+          )
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {expenses.map((exp) => {

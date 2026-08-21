@@ -5,6 +5,8 @@ import { useAuth } from "../../../../lib/authContext";
 import { apiRequest } from "../../../../lib/apiClient";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import LoadingSpinner from "../../../../components/LoadingSpinner";
+import ErrorBanner from "../../../../components/ErrorBanner";
 
 export default function AddExpenseAIPage() {
   const { id } = useParams();
@@ -176,14 +178,18 @@ export default function AddExpenseAIPage() {
   };
 
   if (authLoading || loading) {
-    return <div className="card">Loading group members...</div>;
+    return (
+      <div className="card">
+        <LoadingSpinner label="Loading group members..." />
+      </div>
+    );
   }
 
   if (error && !group) {
     return (
       <div className="card">
-        <div className="error-message">{error}</div>
-        <Link href={`/groups/${id}`} style={{ color: "#2563eb" }}>
+        <ErrorBanner message={error} onRetry={() => router.refresh()} />
+        <Link href={`/groups/${id}`} style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
           ← Back to Group
         </Link>
       </div>
