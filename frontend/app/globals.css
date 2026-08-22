@@ -1,3 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..800;1,9..144,400..700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --paper: #F6F4EF;
+  --ink: #22291F;
+  --moss: #4F6B4A;
+  --mustard: #C99A2E;
+  --rust: #A8492F;
+  --line: #DCD6C8;
+  --white: #FFFFFF;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -5,89 +17,297 @@
 }
 
 body {
-  background-color: #f9fafb;
-  color: #111827;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+/* Typography tokens */
+.font-display {
+  font-family: 'Fraunces', Georgia, serif;
+  font-optical-sizing: auto;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.font-body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.font-mono {
+  font-family: 'IBM Plex Mono', monospace;
+  font-feature-settings: "tnum";
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Fraunces', Georgia, serif;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+p, span, div, label {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Text Colors */
+.text-ink { color: var(--ink); }
+.text-moss { color: var(--moss); }
+.text-mustard { color: var(--mustard); }
+.text-rust { color: var(--rust); }
+.text-paper { color: var(--paper); }
+.text-muted { color: rgba(34, 41, 31, 0.65); }
+
+/* Form Controls */
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
 }
 
 input, select, textarea {
   width: 100%;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   font-size: 14px;
-  font-family: inherit;
+  font-family: 'Inter', sans-serif;
+  color: var(--ink);
+  background-color: var(--white);
   box-sizing: border-box;
-  min-height: 40px;
+  min-height: 42px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgba(34, 41, 31, 0.4);
 }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: var(--moss);
+  box-shadow: 0 0 0 3px rgba(79, 107, 74, 0.15);
 }
 
+/* AI specific input styling */
+.ai-textarea {
+  border: 1px solid var(--mustard) !important;
+}
+
+.ai-textarea:focus {
+  outline: none;
+  border-color: var(--mustard) !important;
+  box-shadow: 0 0 0 3px rgba(201, 154, 46, 0.2) !important;
+}
+
+/* Buttons */
 button {
   width: 100%;
   padding: 10px 16px;
-  background-color: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 6px;
+  background-color: var(--moss);
+  color: var(--paper);
+  border: 1px solid var(--moss);
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
+  font-family: 'Inter', sans-serif;
   cursor: pointer;
-  min-height: 40px;
+  min-height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+  gap: 8px;
+  transition: background-color 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
 }
 
 button:hover:not(:disabled) {
-  background-color: #1d4ed8;
+  background-color: #425a3e;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 button:disabled {
-  opacity: 0.65;
+  opacity: 0.55;
   cursor: not-allowed;
+  transform: none;
 }
 
-.error-message {
-  color: #dc2626;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  padding: 10px 14px;
-  border-radius: 6px;
-  margin-bottom: 14px;
-  font-size: 14px;
+/* Button Variants */
+.btn-primary {
+  background-color: var(--moss) !important;
+  color: var(--paper) !important;
+  border-color: var(--moss) !important;
 }
 
-.success-message {
-  color: #065f46;
-  background-color: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  padding: 10px 14px;
-  border-radius: 6px;
-  margin-bottom: 14px;
-  font-size: 14px;
+.btn-primary:hover:not(:disabled) {
+  background-color: #425a3e !important;
 }
 
+.btn-secondary {
+  background-color: var(--white) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--line) !important;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: rgba(220, 214, 200, 0.3) !important;
+}
+
+.btn-danger, .btn-destructive {
+  background-color: transparent !important;
+  color: var(--rust) !important;
+  border: 1px solid rgba(168, 73, 47, 0.3) !important;
+}
+
+.btn-danger:hover:not(:disabled), .btn-destructive:hover:not(:disabled) {
+  background-color: rgba(168, 73, 47, 0.08) !important;
+}
+
+.btn-mustard, .btn-ai {
+  background-color: var(--mustard) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--mustard) !important;
+  font-weight: 600;
+}
+
+.btn-mustard:hover:not(:disabled), .btn-ai:hover:not(:disabled) {
+  background-color: #b58925 !important;
+}
+
+/* Card Surface — Flat with hairline border, no heavy drop-shadows */
 .card {
-  background: white;
+  background: var(--white);
   padding: 24px;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-  border: 1px solid #f3f4f6;
+  border: 1px solid var(--line);
   margin-top: 20px;
 }
 
+/* The Signature Element: Running Tab Card */
+.running-tab-card {
+  background: var(--white);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(34, 41, 31, 0.06);
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.running-tab-perforation {
+  height: 12px;
+  width: 100%;
+  background-image: radial-gradient(circle, transparent 3px, #F6F4EF 3px);
+  background-size: 12px 12px;
+  background-position: 0 -6px;
+}
+
+/* Receipt Line Items */
+.receipt-row {
+  display: flex;
+  justifyContent: space-between;
+  align-items: baseline;
+  border-bottom: 1px dotted var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.receipt-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Category Pill */
+.category-pill {
+  display: inline-block;
+  background-color: rgba(201, 154, 46, 0.15);
+  color: var(--mustard);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  text-transform: capitalize;
+}
+
+/* Alerts / Banners */
+.error-message {
+  color: var(--rust);
+  background-color: rgba(168, 73, 47, 0.08);
+  border: 1px solid rgba(168, 73, 47, 0.25);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.success-message {
+  color: var(--moss);
+  background-color: rgba(79, 107, 74, 0.1);
+  border: 1px solid rgba(79, 107, 74, 0.25);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* AI Draft Notice Box */
+.ai-draft-box {
+  background-color: rgba(201, 154, 46, 0.1);
+  border: 1px solid rgba(201, 154, 46, 0.35);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+/* Underlined Text Tabs for Split Method */
+.tab-underlined {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(34, 41, 31, 0.6);
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  cursor: pointer;
+  min-height: auto;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: all 0.15s ease;
+}
+
+.tab-underlined.active {
+  color: var(--ink) !important;
+  border-bottom: 2px solid var(--moss) !important;
+}
+
+/* Responsive adjustments */
 @media (max-width: 640px) {
   .card {
-    padding: 16px;
+    padding: 18px 14px;
     margin-top: 14px;
   }
 }

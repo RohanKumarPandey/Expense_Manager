@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import ErrorBanner from "../../../../components/ErrorBanner";
+import { Sparkles, Check, RotateCcw, FileText } from "lucide-react";
 
 export default function AddExpenseAIPage() {
   const { id } = useParams();
@@ -198,67 +199,77 @@ export default function AddExpenseAIPage() {
     return (
       <div className="card">
         <ErrorBanner message={error} onRetry={() => router.refresh()} />
-        <Link href={`/groups/${id}`} style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
-          ← Back to Group
+        <Link href={`/groups/${id}`} style={{ color: "var(--moss)", textDecoration: "none", fontSize: "14px", fontWeight: 600 }}>
+          ← Back to Tab
         </Link>
       </div>
     );
   }
 
   return (
-    <div>
+    <div style={{ maxWidth: "680px", margin: "16px auto" }}>
       <div style={{ marginBottom: "16px" }}>
         <Link
           href={`/groups/${id}`}
-          style={{ color: "#2563eb", fontSize: "14px", textDecoration: "none" }}
+          style={{ color: "var(--moss)", fontSize: "13px", fontWeight: 600, textDecoration: "none" }}
         >
-          ← Back to {group?.name || "Group"}
+          ← Back to {group?.name || "Tab"}
         </Link>
       </div>
 
-      <div className="card" style={{ marginTop: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h1 style={{ fontSize: "22px", margin: 0 }}>
-            ✨ Natural-Language Expense Entry
-          </h1>
+      <div className="card" style={{ marginTop: 0, padding: "28px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+          <div>
+            <h1 className="font-display" style={{ fontSize: "22px", margin: "0 0 2px 0" }}>
+              Add with natural language
+            </h1>
+            <span className="font-body" style={{ fontSize: "13px", color: "rgba(34, 41, 31, 0.65)" }}>
+              AI drafts the item — you review and confirm before it hits the tab
+            </span>
+          </div>
           <span
+            className="font-mono tabular-nums"
             style={{
-              fontSize: "12px",
+              fontSize: "11px",
               padding: "3px 8px",
-              background: "#dbeafe",
-              color: "#1e40af",
-              borderRadius: "12px",
-              fontWeight: 600,
+              background: "rgba(201, 154, 46, 0.15)",
+              color: "var(--mustard)",
+              borderRadius: "4px",
+              fontWeight: 700,
+              border: "1px solid rgba(201, 154, 46, 0.3)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
             }}
           >
-            AI Drafted
+            <Sparkles size={12} />
+            <span>AI ASSISTED</span>
           </span>
         </div>
 
-        {error && <div className="error-message">{error}</div>}
+        <ErrorBanner message={error} />
 
         {/* View Mode 1: AI Prompt Input */}
         {viewMode === "prompt" && (
           <div>
-            <p style={{ fontSize: "14px", color: "#4b5563", marginBottom: "16px" }}>
-              Type an expense naturally in plain English, Hindi, or Hinglish.
-              We'll extract the amount, category, payer, and split participants into an editable draft.
+            <p className="font-body" style={{ fontSize: "14px", color: "rgba(34, 41, 31, 0.75)", marginBottom: "14px" }}>
+              Type an expense in plain English, Hindi, or Hinglish:
             </p>
 
             <form onSubmit={handleParseAI}>
-              <div style={{ marginBottom: "12px" }}>
+              <div style={{ marginBottom: "14px" }}>
                 <textarea
                   rows={3}
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}
-                  placeholder='e.g., "Rohan Pandey paid 1200 for dinner" or "Maine 600 rupaye snacks ke bhare"'
+                  placeholder='e.g. "Rohan Pandey paid 1200 for dinner" or "Maine 600 rupaye snacks ke bhare"'
+                  className="ai-textarea"
                   style={{
                     width: "100%",
                     padding: "12px",
-                    borderRadius: "6px",
-                    border: "1px solid #d1d5db",
+                    borderRadius: "8px",
                     fontSize: "14px",
-                    fontFamily: "inherit",
+                    fontFamily: "'Inter', sans-serif",
                     resize: "vertical",
                     boxSizing: "border-box",
                   }}
@@ -266,25 +277,23 @@ export default function AddExpenseAIPage() {
               </div>
 
               {/* Sample Prompts */}
-              <div style={{ marginBottom: "18px" }}>
-                <span style={{ fontSize: "12px", color: "#6b7280", marginRight: "6px" }}>
-                  💡 Try an example:
+              <div style={{ marginBottom: "20px" }}>
+                <span className="font-body" style={{ fontSize: "12px", color: "rgba(34, 41, 31, 0.6)", fontWeight: 600, display: "block", marginBottom: "6px" }}>
+                  💡 Examples:
                 </span>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                   {samplePrompts.map((sample, idx) => (
                     <button
                       key={idx}
                       type="button"
                       onClick={() => setPromptText(sample)}
+                      className="btn-secondary"
                       style={{
                         width: "auto",
-                        padding: "4px 8px",
+                        padding: "3px 8px",
                         fontSize: "12px",
-                        backgroundColor: "#f3f4f6",
-                        color: "#374151",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        cursor: "pointer",
+                        borderRadius: "4px",
+                        minHeight: "26px",
                       }}
                     >
                       {sample}
@@ -293,30 +302,38 @@ export default function AddExpenseAIPage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "10px" }}>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 <button
                   type="submit"
                   disabled={parsing || !promptText.trim()}
+                  className="btn-ai"
                   style={{
-                    backgroundColor: parsing || !promptText.trim() ? "#93c5fd" : "#2563eb",
-                    cursor: parsing || !promptText.trim() ? "not-allowed" : "pointer",
-                    padding: "10px 16px",
-                    fontWeight: 600,
+                    flex: "2 1 180px",
+                    padding: "10px 18px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
                   }}
                 >
-                  {parsing ? "✨ Parsing with AI..." : "✨ Parse with AI"}
+                  <Sparkles size={15} />
+                  <span>{parsing ? "Parsing text..." : "Parse into draft"}</span>
                 </button>
-                <Link href={`/groups/${id}/add`} style={{ flex: 1 }}>
+                <Link href={`/groups/${id}/add`} style={{ flex: "1 1 140px", textDecoration: "none" }}>
                   <button
                     type="button"
+                    className="btn-secondary"
                     style={{
-                      backgroundColor: "#f3f4f6",
-                      color: "#374151",
-                      border: "1px solid #d1d5db",
-                      padding: "10px 16px",
+                      width: "100%",
+                      padding: "10px 18px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
                     }}
                   >
-                    Manual Form
+                    <FileText size={15} />
+                    <span>Manual form</span>
                   </button>
                 </Link>
               </div>
@@ -327,142 +344,110 @@ export default function AddExpenseAIPage() {
         {/* View Mode 2 & 3: Draft Review or Fallback Manual Entry */}
         {(viewMode === "draft" || viewMode === "fallback") && (
           <div>
-            {/* Context Notice */}
+            {/* Context Notice Box in Mustard */}
             {viewMode === "draft" ? (
-              <div
-                style={{
-                  background: "#eff6ff",
-                  border: "1px solid #bfdbfe",
-                  padding: "12px 14px",
-                  borderRadius: "8px",
-                  marginBottom: "18px",
-                  fontSize: "13px",
-                  color: "#1e40af",
-                  lineHeight: "1.4",
-                }}
-              >
-                ✨ <strong>AI Draft Generated:</strong> Please review and adjust the parsed details below. The expense is only saved when you click <strong>Confirm & Save</strong>.
+              <div className="ai-draft-box" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Sparkles size={16} style={{ color: "var(--mustard)", flexShrink: 0 }} />
+                <span>
+                  <strong>AI Draft:</strong> Review the extracted details below. The item is only added to the running tab when you click <strong>Confirm and save</strong>.
+                </span>
               </div>
             ) : (
               <div
                 style={{
-                  background: "#fffbeb",
-                  border: "1px solid #fde68a",
+                  background: "rgba(201, 154, 46, 0.1)",
+                  border: "1px solid rgba(201, 154, 46, 0.3)",
                   padding: "12px 14px",
                   borderRadius: "8px",
                   marginBottom: "18px",
                   fontSize: "13px",
-                  color: "#92400e",
+                  color: "var(--ink)",
                   lineHeight: "1.4",
                 }}
               >
-                💡 <strong>Couldn't parse automatically:</strong> {parseNotice || "Please fill in the remaining details below to record this expense."}
+                💡 {parseNotice || "Please fill in the remaining details below to record this expense."}
               </div>
             )}
 
             <form onSubmit={handleSaveExpense}>
-              <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-                  Total Amount (₹)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  placeholder="e.g. 1200.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px" }}>
+                <div>
+                  <label>Amount (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="font-mono tabular-nums"
+                    style={{ fontSize: "16px", fontWeight: 600 }}
+                  />
+                </div>
+
+                <div>
+                  <label>Description</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Groceries and snacks"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-                  Description
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Groceries and snacks"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px" }}>
+                <div>
+                  <label>Category</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    <option value="rent">Rent</option>
+                    <option value="groceries">Groceries</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="food">Food</option>
+                    <option value="travel">Travel</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
 
-              <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-                  Category
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "14px",
-                    backgroundColor: "#fff",
-                  }}
-                >
-                  <option value="rent">Rent</option>
-                  <option value="groceries">Groceries</option>
-                  <option value="utilities">Utilities</option>
-                  <option value="food">Food</option>
-                  <option value="travel">Travel</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              {/* Paid By Selector */}
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-                  Paid By
-                </label>
-                <select
-                  value={paidBy}
-                  onChange={(e) => setPaidBy(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid #d1d5db",
-                    fontSize: "14px",
-                    backgroundColor: "#fff",
-                  }}
-                >
-                  {group?.members?.map((m) => {
-                    const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "Member" };
-                    const memberId = (memberUser._id || memberUser.id).toString();
-                    const isSelf = memberId === (user?._id || user?.id)?.toString();
-                    return (
-                      <option key={memberId} value={memberId}>
-                        {memberUser.name} {isSelf ? "(You)" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
+                {/* Paid By Selector */}
+                <div>
+                  <label>Paid by</label>
+                  <select
+                    value={paidBy}
+                    onChange={(e) => setPaidBy(e.target.value)}
+                  >
+                    {group?.members?.map((m) => {
+                      const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "Member" };
+                      const memberId = (memberUser._id || memberUser.id).toString();
+                      const isSelf = memberId === (user?._id || user?.id)?.toString();
+                      return (
+                        <option key={memberId} value={memberId}>
+                          {memberUser.name} {isSelf ? "(You)" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
 
               {/* Equal Split Participants */}
-              <div style={{ marginBottom: "20px" }}>
+              <div style={{ marginBottom: "24px", marginTop: "8px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label style={{ fontSize: "14px", fontWeight: 500 }}>
+                  <span className="font-body" style={{ fontSize: "13px", color: "rgba(34, 41, 31, 0.7)" }}>
                     Split equally among ({selectedParticipants.length} selected):
-                  </label>
+                  </span>
                   <button
                     type="button"
                     onClick={handleSelectAllParticipants}
-                    style={{
-                      width: "auto",
-                      padding: "2px 8px",
-                      fontSize: "12px",
-                      backgroundColor: "#f3f4f6",
-                      color: "#374151",
-                      border: "1px solid #d1d5db",
-                    }}
+                    className="btn-secondary"
+                    style={{ width: "auto", padding: "2px 8px", fontSize: "11px", minHeight: "26px" }}
                   >
-                    Select All
+                    Select all
                   </button>
                 </div>
 
@@ -470,11 +455,11 @@ export default function AddExpenseAIPage() {
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: "8px",
-                    background: "#f9fafb",
+                    gap: "6px",
+                    background: "var(--paper)",
                     padding: "12px",
                     borderRadius: "6px",
-                    border: "1px solid #e5e7eb",
+                    border: "1px solid var(--line)",
                   }}
                 >
                   {group?.members?.map((m) => {
@@ -488,21 +473,23 @@ export default function AddExpenseAIPage() {
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "10px",
+                          gap: "8px",
                           cursor: "pointer",
-                          fontSize: "14px",
+                          fontSize: "13px",
+                          padding: "4px 6px",
+                          margin: 0,
                         }}
                       >
                         <input
                           type="checkbox"
-                          style={{ width: "auto", margin: 0 }}
+                          style={{ width: "auto", margin: 0, minHeight: "auto" }}
                           checked={isChecked}
                           onChange={() => handleToggleParticipant(memberId)}
                         />
                         <span>
                           {memberUser.name}{" "}
                           {memberId === (user?._id || user?.id)?.toString() && (
-                            <span style={{ color: "#2563eb", fontSize: "12px" }}>(You)</span>
+                            <strong style={{ color: "var(--moss)" }}>(You)</strong>
                           )}
                         </span>
                       </label>
@@ -512,29 +499,38 @@ export default function AddExpenseAIPage() {
               </div>
 
               {/* Action Buttons */}
-              <div style={{ display: "flex", gap: "10px" }}>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 <button
                   type="submit"
                   disabled={saving || !parseFloat(amount) || selectedParticipants.length === 0}
+                  className="btn-primary"
                   style={{
-                    flex: 2,
-                    backgroundColor: saving ? "#93c5fd" : "#059669",
-                    fontWeight: 600,
+                    flex: "2 1 180px",
+                    padding: "10px 18px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
                   }}
                 >
-                  {saving ? "Saving Expense..." : "✓ Confirm & Save"}
+                  <Check size={16} />
+                  <span>{saving ? "Adding to tab..." : "Confirm and save"}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleResetPrompt}
+                  className="btn-secondary"
                   style={{
-                    flex: 1,
-                    backgroundColor: "#f3f4f6",
-                    color: "#374151",
-                    border: "1px solid #d1d5db",
+                    flex: "1 1 140px",
+                    padding: "10px 18px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
                   }}
                 >
-                  ↻ Re-try Prompt
+                  <RotateCcw size={15} />
+                  <span>Try again</span>
                 </button>
               </div>
             </form>

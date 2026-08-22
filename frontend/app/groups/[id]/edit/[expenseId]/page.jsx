@@ -7,6 +7,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import LoadingSpinner from "../../../../../components/LoadingSpinner";
 import ErrorBanner from "../../../../../components/ErrorBanner";
+import Amount from "../../../../../components/Amount";
+import { Check } from "lucide-react";
 
 export default function EditExpensePage() {
   const { id, expenseId } = useParams();
@@ -50,9 +52,9 @@ export default function EditExpensePage() {
           const expenseData = expenseRes.data.expense;
 
           // Permission check: only creator can edit
-          const currentUserId = user?._id || user?.id;
-          const creatorId = expenseData.createdBy?._id || expenseData.createdBy?.id || expenseData.createdBy;
-          if (creatorId?.toString() !== currentUserId?.toString()) {
+          const currentUserId = (user?._id || user?.id || "").toString();
+          const creatorId = (expenseData.createdBy?._id || expenseData.createdBy?.id || expenseData.createdBy || "").toString();
+          if (creatorId !== currentUserId) {
             setError("Only the creator can edit this expense.");
             setLoading(false);
             return;
@@ -68,7 +70,7 @@ export default function EditExpensePage() {
           setSplitType(expenseData.splitType || "equal");
 
           const memberIds = (groupData.members || []).map((m) =>
-            typeof m.user === "object" ? m.user._id || m.user.id : m.user
+            typeof m.user === "object" ? (m.user._id || m.user.id).toString() : m.user.toString()
           );
 
           // Build maps for unequal and percentage
@@ -81,7 +83,7 @@ export default function EditExpensePage() {
 
           const participantUserIds = [];
           (expenseData.participants || []).forEach((p) => {
-            const pUid = typeof p.user === "object" ? p.user._id || p.user.id : p.user;
+            const pUid = (typeof p.user === "object" ? p.user._id || p.user.id : p.user).toString();
             participantUserIds.push(pUid);
             if (p.share !== undefined) {
               initialShares[pUid] = (p.share / 100).toString();
@@ -144,7 +146,7 @@ export default function EditExpensePage() {
   const handleSelectAllEqual = () => {
     if (!group?.members) return;
     const allIds = group.members.map((m) =>
-      typeof m.user === "object" ? m.user._id || m.user.id : m.user
+      typeof m.user === "object" ? (m.user._id || m.user.id).toString() : m.user.toString()
     );
     setSelectedEqualParticipants(allIds);
   };
@@ -170,7 +172,7 @@ export default function EditExpensePage() {
     setError("");
 
     if (!parsedTotalAmount || parsedTotalAmount <= 0) {
-      setError("Please enter a valid amount greater than zero.");
+      setError("Please enter a valid positive amount.");
       return;
     }
 
@@ -237,7 +239,7 @@ export default function EditExpensePage() {
     setSubmitting(true);
     try {
       await apiRequest(`/groups/${id}/expenses/${expenseId}`, {
-        method: "PATCH",
+        method: "PUT",
         body: JSON.stringify(payload),
       });
       router.push(`/groups/${id}`);
@@ -260,8 +262,8 @@ export default function EditExpensePage() {
     return (
       <div className="card">
         <ErrorBanner message={error} onRetry={() => router.refresh()} />
-        <Link href={`/groups/${id}`} style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
-          ← Back to Group
+        <Link href={`/groups/${id}`} style={{ color: "var(--moss)", textDecoration: "none", fontSize: "14px", fontWeight: 600 }}>
+          ← Back to Tab
         </Link>
       </div>
     );
@@ -275,62 +277,55 @@ export default function EditExpensePage() {
     (splitType === "percentage" && !isPercentageValid);
 
   return (
-    <div>
+    <div style={{ maxWidth: "680px", margin: "16px auto" }}>
       <div style={{ marginBottom: "16px" }}>
-        <Link href={`/groups/${id}`} style={{ color: "#2563eb", fontSize: "14px", textDecoration: "none" }}>
-          ← Back to {group?.name || "Group"}
+        <Link href={`/groups/${id}`} style={{ color: "var(--moss)", fontSize: "13px", fontWeight: 600, textDecoration: "none" }}>
+          ← Back to {group?.name || "Tab"}
         </Link>
       </div>
 
-      <div className="card" style={{ marginTop: 0 }}>
-        <h1 style={{ fontSize: "22px", marginBottom: "16px" }}>Edit Expense</h1>
+      <div className="card" style={{ marginTop: 0, padding: "28px" }}>
+        <div style={{ marginBottom: "20px" }}>
+          <h1 className="font-display" style={{ fontSize: "22px", margin: "0 0 2px 0" }}>Edit expense</h1>
+          <span className="font-body" style={{ fontSize: "13px", color: "rgba(34, 41, 31, 0.6)" }}>Update recorded amounts or split method</span>
+        </div>
 
-        {error && <div className="error-message">{error}</div>}
+        <ErrorBanner message={error} />
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-              Total Amount (₹)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              placeholder="e.g. 300.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px" }}>
+            <div>
+              <label>Amount (₹)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="font-mono tabular-nums"
+                style={{ fontSize: "16px", fontWeight: 600 }}
+              />
+            </div>
+
+            <div>
+              <label>Description</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Wi-Fi bill, Groceries, Dinner"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-              Description
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Wi-Fi bill, Groceries, Dinner"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-
-          <div style={{ marginBottom: "16px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "4px" }}>
-              Category
-            </label>
+          <div>
+            <label>Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "6px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-                backgroundColor: "#fff",
-              }}
             >
               <option value="rent">Rent</option>
               <option value="groceries">Groceries</option>
@@ -341,32 +336,26 @@ export default function EditExpensePage() {
             </select>
           </div>
 
-          {/* Split Type Selector */}
-          <div style={{ marginBottom: "18px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "8px" }}>
-              Split Method
-            </label>
-            <div style={{ display: "flex", gap: "8px" }}>
+          {/* Underlined Text Tabs for Split Method */}
+          <div style={{ marginTop: "12px", marginBottom: "18px" }}>
+            <label>Split Method</label>
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                borderBottom: "1px solid var(--line)",
+              }}
+            >
               {[
                 { id: "equal", label: "Equal (=)" },
-                { id: "unequal", label: "Unequal (₹)" },
-                { id: "percentage", label: "Percentage (%)" },
+                { id: "unequal", label: "Exact amounts (₹)" },
+                { id: "percentage", label: "Percentages (%)" },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setSplitType(tab.id)}
-                  style={{
-                    flex: 1,
-                    padding: "8px 12px",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    borderRadius: "6px",
-                    backgroundColor: splitType === tab.id ? "#2563eb" : "#f3f4f6",
-                    color: splitType === tab.id ? "#ffffff" : "#374151",
-                    border: splitType === tab.id ? "1px solid #2563eb" : "1px solid #e5e7eb",
-                    cursor: "pointer",
-                  }}
+                  className={`tab-underlined ${splitType === tab.id ? "active" : ""}`}
                 >
                   {tab.label}
                 </button>
@@ -375,34 +364,38 @@ export default function EditExpensePage() {
           </div>
 
           {/* Split Details Section */}
-          <div style={{ marginBottom: "20px" }}>
+          <div style={{ marginBottom: "24px" }}>
             {/* Equal Split Mode */}
             {splitType === "equal" && (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label style={{ fontSize: "14px", fontWeight: 500 }}>
+                  <span className="font-body" style={{ fontSize: "13px", color: "rgba(34, 41, 31, 0.7)" }}>
                     Split equally among ({selectedEqualParticipants.length} selected):
-                  </label>
+                  </span>
                   <button
                     type="button"
                     onClick={handleSelectAllEqual}
-                    style={{
-                      width: "auto",
-                      padding: "2px 8px",
-                      fontSize: "12px",
-                      backgroundColor: "#f3f4f6",
-                      color: "#374151",
-                      border: "1px solid #d1d5db",
-                    }}
+                    className="btn-secondary"
+                    style={{ width: "auto", padding: "2px 8px", fontSize: "11px", minHeight: "26px" }}
                   >
-                    Select All
+                    Select all
                   </button>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "#f9fafb", padding: "12px", borderRadius: "6px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                    background: "var(--paper)",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--line)",
+                  }}
+                >
                   {group?.members?.map((m) => {
                     const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "User" };
-                    const memberId = memberUser._id || memberUser.id;
+                    const memberId = (memberUser._id || memberUser.id).toString();
                     const isChecked = selectedEqualParticipants.includes(memberId);
 
                     return (
@@ -411,20 +404,24 @@ export default function EditExpensePage() {
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "10px",
+                          gap: "8px",
                           cursor: "pointer",
-                          fontSize: "14px",
+                          fontSize: "13px",
+                          padding: "4px 6px",
+                          margin: 0,
                         }}
                       >
                         <input
                           type="checkbox"
-                          style={{ width: "auto", margin: 0 }}
+                          style={{ width: "auto", margin: 0, minHeight: "auto" }}
                           checked={isChecked}
                           onChange={() => handleToggleEqualParticipant(memberId)}
                         />
                         <span>
                           {memberUser.name}{" "}
-                          {memberId === (user?._id || user?.id) && <span style={{ color: "#2563eb", fontSize: "12px" }}>(You)</span>}
+                          {memberId === (user?._id || user?.id)?.toString() && (
+                            <strong style={{ color: "var(--moss)" }}>(You)</strong>
+                          )}
                         </span>
                       </label>
                     );
@@ -437,37 +434,54 @@ export default function EditExpensePage() {
             {splitType === "unequal" && (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label style={{ fontSize: "14px", fontWeight: 500 }}>Enter specific amount per member:</label>
+                  <span className="font-body" style={{ fontSize: "13px", color: "rgba(34, 41, 31, 0.7)" }}>
+                    Enter specific amount per member:
+                  </span>
                   <div
+                    className="font-mono tabular-nums"
                     style={{
                       fontSize: "12px",
                       fontWeight: 600,
-                      padding: "2px 8px",
-                      borderRadius: "12px",
-                      background: isUnequalValid ? "#dcfce7" : "#fee2e2",
-                      color: isUnequalValid ? "#166534" : "#991b1b",
+                      color: isUnequalValid ? "var(--moss)" : "var(--rust)",
                     }}
                   >
-                    ₹{totalUnequalEntered.toFixed(2)} / ₹{parsedTotalAmount.toFixed(2)}
+                    <Amount value={totalUnequalEntered} tone={isUnequalValid ? "positive" : "negative"} /> / <Amount value={parsedTotalAmount} tone="neutral" />
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "#f9fafb", padding: "12px", borderRadius: "6px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    background: "var(--paper)",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--line)",
+                  }}
+                >
                   {group?.members?.map((m) => {
                     const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "User" };
-                    const memberId = memberUser._id || memberUser.id;
+                    const memberId = (memberUser._id || memberUser.id).toString();
 
                     return (
                       <div
                         key={memberId}
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: "12px",
+                        }}
                       >
-                        <span style={{ fontSize: "14px", flex: 1 }}>
+                        <span className="font-body" style={{ fontSize: "13px" }}>
                           {memberUser.name}{" "}
-                          {memberId === (user?._id || user?.id) && <span style={{ color: "#2563eb", fontSize: "12px" }}>(You)</span>}
+                          {memberId === (user?._id || user?.id)?.toString() && (
+                            <strong style={{ color: "var(--moss)" }}>(You)</strong>
+                          )}
                         </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span style={{ fontSize: "14px", color: "#6b7280" }}>₹</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                          <span className="font-mono" style={{ fontSize: "13px", color: "rgba(34, 41, 31, 0.6)" }}>₹</span>
                           <input
                             type="number"
                             step="0.01"
@@ -475,7 +489,8 @@ export default function EditExpensePage() {
                             placeholder="0.00"
                             value={unequalShares[memberId] || ""}
                             onChange={(e) => handleUnequalChange(memberId, e.target.value)}
-                            style={{ width: "100px", margin: 0, padding: "6px 8px", fontSize: "13px" }}
+                            className="font-mono tabular-nums"
+                            style={{ width: "95px", margin: 0, padding: "6px 8px", minHeight: "34px", fontSize: "13px" }}
                           />
                         </div>
                       </div>
@@ -484,8 +499,8 @@ export default function EditExpensePage() {
                 </div>
 
                 {!isUnequalValid && parsedTotalAmount > 0 && (
-                  <p style={{ fontSize: "12px", color: "#dc2626", marginTop: "6px" }}>
-                    Remaining difference: ₹{(parsedTotalAmount - totalUnequalEntered).toFixed(2)}
+                  <p className="font-body" style={{ fontSize: "12px", color: "var(--rust)", marginTop: "6px", fontWeight: 500 }}>
+                    Remaining: ₹{(parsedTotalAmount - totalUnequalEntered).toFixed(2)}
                   </p>
                 )}
               </div>
@@ -495,36 +510,53 @@ export default function EditExpensePage() {
             {splitType === "percentage" && (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label style={{ fontSize: "14px", fontWeight: 500 }}>Enter percentage share per member:</label>
+                  <span className="font-body" style={{ fontSize: "13px", color: "rgba(34, 41, 31, 0.7)" }}>
+                    Enter percentage share per member:
+                  </span>
                   <div
+                    className="font-mono tabular-nums"
                     style={{
                       fontSize: "12px",
                       fontWeight: 600,
-                      padding: "2px 8px",
-                      borderRadius: "12px",
-                      background: isPercentageValid ? "#dcfce7" : "#fee2e2",
-                      color: isPercentageValid ? "#166534" : "#991b1b",
+                      color: isPercentageValid ? "var(--moss)" : "var(--rust)",
                     }}
                   >
                     {totalPercentageEntered.toFixed(1)}% / 100%
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "#f9fafb", padding: "12px", borderRadius: "6px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    background: "var(--paper)",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--line)",
+                  }}
+                >
                   {group?.members?.map((m) => {
                     const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "User" };
-                    const memberId = memberUser._id || memberUser.id;
+                    const memberId = (memberUser._id || memberUser.id).toString();
 
                     return (
                       <div
                         key={memberId}
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: "12px",
+                        }}
                       >
-                        <span style={{ fontSize: "14px", flex: 1 }}>
+                        <span className="font-body" style={{ fontSize: "13px" }}>
                           {memberUser.name}{" "}
-                          {memberId === (user?._id || user?.id) && <span style={{ color: "#2563eb", fontSize: "12px" }}>(You)</span>}
+                          {memberId === (user?._id || user?.id)?.toString() && (
+                            <strong style={{ color: "var(--moss)" }}>(You)</strong>
+                          )}
                         </span>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                           <input
                             type="number"
                             step="0.01"
@@ -533,9 +565,10 @@ export default function EditExpensePage() {
                             placeholder="0"
                             value={percentages[memberId] || ""}
                             onChange={(e) => handlePercentageChange(memberId, e.target.value)}
-                            style={{ width: "80px", margin: 0, padding: "6px 8px", fontSize: "13px" }}
+                            className="font-mono tabular-nums"
+                            style={{ width: "75px", margin: 0, padding: "6px 8px", minHeight: "34px", fontSize: "13px" }}
                           />
-                          <span style={{ fontSize: "14px", color: "#6b7280" }}>%</span>
+                          <span className="font-mono" style={{ fontSize: "13px", color: "rgba(34, 41, 31, 0.6)" }}>%</span>
                         </div>
                       </div>
                     );
@@ -543,7 +576,7 @@ export default function EditExpensePage() {
                 </div>
 
                 {!isPercentageValid && (
-                  <p style={{ fontSize: "12px", color: "#dc2626", marginTop: "6px" }}>
+                  <p className="font-body" style={{ fontSize: "12px", color: "var(--rust)", marginTop: "6px", fontWeight: 500 }}>
                     Remaining percentage: {(100 - totalPercentageEntered).toFixed(1)}%
                   </p>
                 )}
@@ -554,12 +587,18 @@ export default function EditExpensePage() {
           <button
             type="submit"
             disabled={isSubmitDisabled}
+            className="btn-primary"
             style={{
-              backgroundColor: isSubmitDisabled ? "#93c5fd" : "#2563eb",
-              cursor: isSubmitDisabled ? "not-allowed" : "pointer",
+              width: "100%",
+              padding: "10px 18px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
             }}
           >
-            {submitting ? "Updating Expense..." : "Update Expense"}
+            <Check size={16} />
+            <span>{submitting ? "Saving changes..." : "Save changes"}</span>
           </button>
         </form>
       </div>

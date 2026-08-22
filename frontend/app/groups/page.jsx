@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ErrorBanner from "../../components/ErrorBanner";
 import EmptyState from "../../components/EmptyState";
+import GroupCard from "../../components/GroupCard";
+import { LayoutDashboard, Plus, UserPlus, Check } from "lucide-react";
 
 export default function GroupsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -93,179 +95,165 @@ export default function GroupsPage() {
 
   return (
     <div>
+      {/* Page Header in Fraunces */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "baseline",
           marginBottom: "20px",
           flexWrap: "wrap",
           gap: "12px",
         }}
       >
-        <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}>My Groups</h1>
-        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-          <Link
-            href="/dashboard"
+        <div>
+          <h1 className="font-display" style={{ fontSize: "26px", margin: "0 0 2px 0", color: "var(--ink)" }}>
+            Household Tabs
+          </h1>
+          <p className="font-body" style={{ color: "rgba(34, 41, 31, 0.65)", fontSize: "14px", margin: 0 }}>
+            Shared ledgers with flatmates and roommates
+          </p>
+        </div>
+
+        <Link href="/dashboard" style={{ textDecoration: "none" }}>
+          <button
+            className="btn-secondary"
             style={{
-              color: "#059669",
-              fontSize: "14px",
-              textDecoration: "none",
-              fontWeight: 600,
+              width: "auto",
+              padding: "6px 14px",
+              fontSize: "13px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
             }}
           >
-            📊 Dashboard
-          </Link>
-          <Link href="/" style={{ color: "#2563eb", fontSize: "14px", textDecoration: "none" }}>
-            ← Home
-          </Link>
-        </div>
+            <LayoutDashboard size={15} style={{ color: "var(--moss)" }} />
+            <span>Open Dashboard</span>
+          </button>
+        </Link>
       </div>
 
       <ErrorBanner message={error} onRetry={fetchGroups} />
 
       {success && (
-        <div
-          style={{
-            backgroundColor: "#ecfdf5",
-            border: "1px solid #a7f3d0",
-            color: "#065f46",
-            padding: "10px 14px",
-            borderRadius: "6px",
-            marginBottom: "16px",
-            fontSize: "14px",
-          }}
-        >
-          ✓ {success}
+        <div className="success-message">
+          <Check size={16} />
+          <span>{success}</span>
         </div>
       )}
 
-      {/* Forms Grid — Responsive 2 cols on tablet/desktop, 1 col on mobile */}
+      {/* Forms Grid */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: "20px",
+          gap: "16px",
           marginBottom: "28px",
         }}
       >
         {/* Create Group Form */}
-        <div className="card" style={{ marginTop: 0 }}>
-          <h2 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>
-            ➕ Create a Group
-          </h2>
+        <div className="card" style={{ marginTop: 0, padding: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+            <Plus size={16} style={{ color: "var(--moss)" }} />
+            <h2 className="font-display" style={{ fontSize: "17px", margin: 0 }}>
+              Create a New Tab
+            </h2>
+          </div>
+          <p className="font-body" style={{ fontSize: "12px", color: "rgba(34, 41, 31, 0.6)", marginBottom: "14px" }}>
+            Start a ledger for a new apartment or household
+          </p>
+
           <form onSubmit={handleCreateGroup}>
-            <input
-              type="text"
-              required
-              placeholder="Group Name (e.g. 221B Baker Street)"
-              value={createName}
-              onChange={(e) => setCreateName(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Description (optional)"
-              value={createDesc}
-              onChange={(e) => setCreateDesc(e.target.value)}
-            />
-            <button type="submit" disabled={creating}>
-              {creating ? "Creating..." : "Create Group"}
+            <div>
+              <label>Tab / Group Name</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Flat 302, 221B Baker St"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label>Description (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Rent, groceries, utilities"
+                value={createDesc}
+                onChange={(e) => setCreateDesc(e.target.value)}
+              />
+            </div>
+            <button type="submit" disabled={creating} className="btn-primary">
+              {creating ? "Creating Tab..." : "Create Tab"}
             </button>
           </form>
         </div>
 
         {/* Join Group Form */}
-        <div className="card" style={{ marginTop: 0 }}>
-          <h2 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>
-            🔗 Join a Group
-          </h2>
+        <div className="card" style={{ marginTop: 0, padding: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+            <UserPlus size={16} style={{ color: "var(--mustard)" }} />
+            <h2 className="font-display" style={{ fontSize: "17px", margin: 0 }}>
+              Join an Existing Tab
+            </h2>
+          </div>
+          <p className="font-body" style={{ fontSize: "12px", color: "rgba(34, 41, 31, 0.6)", marginBottom: "14px" }}>
+            Enter the 6-character invite code from a flatmate
+          </p>
+
           <form onSubmit={handleJoinGroup}>
-            <input
-              type="text"
-              required
-              placeholder="Enter 6-char Invite Code"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              maxLength={6}
-            />
-            <button type="submit" disabled={joining} style={{ backgroundColor: "#059669" }}>
-              {joining ? "Joining..." : "Join Group"}
+            <div>
+              <label>Invite Code</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. FLAT01"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                maxLength={6}
+                className="font-mono tabular-nums"
+                style={{ textTransform: "uppercase", letterSpacing: "2px", fontWeight: 700 }}
+              />
+            </div>
+            <div style={{ height: "66px", display: "flex", alignItems: "center", color: "rgba(34, 41, 31, 0.6)", fontSize: "13px" }}>
+              Ask any existing member of your flatmate group for their 6-character code.
+            </div>
+            <button type="submit" disabled={joining} className="btn-secondary">
+              {joining ? "Joining..." : "Join Tab"}
             </button>
           </form>
         </div>
       </div>
 
-      {/* Group List */}
+      {/* Group List Section */}
       <div>
-        <h2 style={{ fontSize: "20px", fontWeight: 600, marginBottom: "14px" }}>
-          Your Groups {!loading && `(${groups.length})`}
-        </h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "14px" }}>
+          <h2 className="font-display" style={{ fontSize: "18px", margin: 0 }}>
+            Your Household Tabs {!loading && `(${groups.length})`}
+          </h2>
+        </div>
 
         {authLoading || loading ? (
           <div className="card" style={{ marginTop: 0 }}>
-            <LoadingSpinner label="Loading your groups..." />
+            <LoadingSpinner label="Loading your household tabs..." />
           </div>
         ) : groups.length === 0 ? (
           <EmptyState
-            icon="👥"
-            title="No groups yet"
-            description="You aren't a member of any flatmate group yet. Create your first group or join an existing one using an invite code above!"
+            title="No household tabs yet"
+            description="You aren't a member of any flatmate tab yet. Create your first tab or join one with an invite code."
           />
         ) : (
-          groups.map((group) => (
-            <div key={group._id} className="card" style={{ marginTop: "12px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  flexWrap: "wrap",
-                  gap: "12px",
-                }}
-              >
-                <div>
-                  <h3 style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 4px 0" }}>
-                    <Link
-                      href={`/groups/${group._id}`}
-                      style={{ textDecoration: "none", color: "#111827" }}
-                    >
-                      {group.name}
-                    </Link>
-                  </h3>
-                  {group.description && (
-                    <p style={{ color: "#6b7280", fontSize: "14px", margin: "0 0 8px 0" }}>
-                      {group.description}
-                    </p>
-                  )}
-                  <p style={{ fontSize: "13px", color: "#4b5563", margin: 0 }}>
-                    Members: <strong>{group.members ? group.members.length : 0}</strong> | Invite Code:{" "}
-                    <code
-                      style={{
-                        background: "#e5e7eb",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {group.inviteCode}
-                    </code>
-                  </p>
-                </div>
-                <Link href={`/groups/${group._id}`}>
-                  <button
-                    style={{
-                      width: "auto",
-                      padding: "8px 16px",
-                      fontSize: "13px",
-                      minHeight: "44px",
-                    }}
-                  >
-                    View Group →
-                  </button>
-                </Link>
-              </div>
-            </div>
-          ))
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "14px",
+            }}
+          >
+            {groups.map((group) => (
+              <GroupCard key={group._id} group={group} />
+            ))}
+          </div>
         )}
       </div>
     </div>

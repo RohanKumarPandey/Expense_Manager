@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "../../lib/authContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ErrorBanner from "../../components/ErrorBanner";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -29,37 +30,71 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="card">
-      <h1 style={{ marginBottom: "20px", fontSize: "24px" }}>Log In</h1>
-      {error && <div className="error-message">{error}</div>}
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label style={{ display: "block", marginBottom: "4px", fontSize: "14px" }}>Email</label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
-          />
+    <div style={{ maxWidth: "380px", margin: "40px auto 0 auto" }}>
+      <div className="card" style={{ padding: "32px 24px" }}>
+        <div style={{ marginBottom: "20px" }}>
+          <h1 className="font-display" style={{ fontSize: "22px", margin: "0 0 4px 0" }}>
+            Log in to your tab
+          </h1>
+          <p className="font-body" style={{ color: "rgba(34, 41, 31, 0.65)", fontSize: "13px", margin: 0 }}>
+            Access your shared household ledgers
+          </p>
         </div>
-        <div>
-          <label style={{ display: "block", marginBottom: "4px", fontSize: "14px" }}>Password</label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-          />
+
+        <ErrorBanner message={error} />
+
+        <form onSubmit={handleSubmit}>
+          <div>
+            <label>Email Address</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+            />
+          </div>
+
+          <div>
+            <label>Password</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+
+          <button type="submit" disabled={loading} className="btn-primary" style={{ marginTop: "4px" }}>
+            {loading ? "Opening session..." : "Log in"}
+          </button>
+        </form>
+
+        <div
+          className="font-body"
+          style={{
+            marginTop: "20px",
+            paddingTop: "16px",
+            borderTop: "1px solid var(--line)",
+            textAlign: "center",
+            fontSize: "13px",
+            color: "rgba(34, 41, 31, 0.7)",
+          }}
+        >
+          Don't have a tab account?{" "}
+          <Link
+            href="/signup"
+            style={{
+              color: "var(--moss)",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Sign up
+          </Link>
         </div>
-        <button type="submit" disabled={loading}>
-          {loading ? "Logging in..." : "Log In"}
-        </button>
-      </form>
-      <p style={{ marginTop: "16px", fontSize: "14px", textAlign: "center" }}>
-        Don't have an account? <Link href="/signup" style={{ color: "#2563eb" }}>Sign up</Link>
-      </p>
+      </div>
     </div>
   );
 }

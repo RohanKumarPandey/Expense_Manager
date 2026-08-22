@@ -8,6 +8,22 @@ import { useParams, useRouter } from "next/navigation";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ErrorBanner from "../../../components/ErrorBanner";
 import EmptyState from "../../../components/EmptyState";
+import RunningTabCard from "../../../components/RunningTabCard";
+import ExpenseRow from "../../../components/ExpenseRow";
+import {
+  Receipt,
+  Plus,
+  Sparkles,
+  Handshake,
+  Users,
+  Copy,
+  Check,
+  Trash2,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+} from "lucide-react";
 
 export default function GroupDetailPage() {
   const { id } = useParams();
@@ -18,6 +34,7 @@ export default function GroupDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [copiedCode, setCopiedCode] = useState(false);
 
   // Balances state
   const [balances, setBalances] = useState([]);
@@ -61,47 +78,40 @@ export default function GroupDetailPage() {
     try {
       setBalancesLoading(true);
       const res = await apiRequest(`/groups/${id}/balances`);
-      setBalances(res.data.balances || []);
+      setBalances(res.data.netBalances || []);
     } catch (err) {
-      console.error("Failed to fetch balances:", err.message);
+      console.error("Failed to load balances:", err);
     } finally {
       setBalancesLoading(false);
     }
   }, [id]);
 
   const fetchExpenses = useCallback(
-    async (
-      pageNum = 1,
-      search = debouncedSearch,
-      cat = categoryFilter,
-      sort = sortBy,
-      order = sortOrder
-    ) => {
+    async (currentPage = 1, search = "", category = "", sort = "date", order = "desc") => {
       try {
         setExpensesLoading(true);
-        const params = new URLSearchParams();
-        params.append("page", pageNum.toString());
-        params.append("limit", "10");
-        if (search) params.append("search", search);
-        if (cat) params.append("category", cat);
-        if (sort) params.append("sortBy", sort);
-        if (order) params.append("order", order);
+        const queryParams = new URLSearchParams();
+        queryParams.set("page", currentPage.toString());
+        queryParams.set("limit", "10");
+        if (search) queryParams.set("search", search);
+        if (category) queryParams.set("category", category);
+        if (sort) queryParams.set("sortBy", sort);
+        if (order) queryParams.set("order", order);
 
-        const res = await apiRequest(`/groups/${id}/expenses?${params.toString()}`);
+        const res = await apiRequest(`/groups/${id}/expenses?${queryParams.toString()}`);
         setExpenses(res.data.expenses || []);
-        setPage(res.data.currentPage || 1);
-        setTotalPages(res.data.totalPages || 1);
-        setTotalExpenses(res.data.totalExpenses || 0);
+        setPage(res.data.pagination.page);
+        setTotalPages(res.data.pagination.totalPages);
+        setTotalExpenses(res.data.pagination.total);
       } catch (err) {
-        console.error("Failed to fetch expenses:", err.message);
+        console.error("Failed to fetch expenses:", err);
       } finally {
         setExpensesLoading(false);
       }
     },
-    [id, debouncedSearch, categoryFilter, sortBy, sortOrder]
+    [id]
   );
 
-  // Initial fetch for group & balances
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/login");
@@ -111,7 +121,6 @@ export default function GroupDetailPage() {
     }
   }, [user, authLoading, id, router, fetchGroupDetail, fetchBalances]);
 
-  // Refetch expenses when filters, sort, search, or page changes
   useEffect(() => {
     if (user && id) {
       fetchExpenses(page, debouncedSearch, categoryFilter, sortBy, sortOrder);
@@ -120,7 +129,7 @@ export default function GroupDetailPage() {
 
   const handleFilterChange = (setter) => (val) => {
     setter(val);
-    setPage(1); // Reset page on filter/sort change
+    setPage(1);
   };
 
   const handleResetFilters = () => {
@@ -137,7 +146,7 @@ export default function GroupDetailPage() {
   const handleDeleteGroup = async () => {
     if (
       !confirm(
-        `Are you sure you want to permanently delete the group "${group?.name}"? All associated expenses and settlement records will be permanently removed. This action cannot be undone.`
+        `Are you sure you want to delete "${group?.name}"? All expenses and settlements will be permanently removed.`
       )
     ) {
       return;
@@ -192,10 +201,18 @@ export default function GroupDetailPage() {
     }
   };
 
+  const handleCopyCode = () => {
+    if (group?.inviteCode) {
+      navigator.clipboard.writeText(group.inviteCode);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="card">
-        <LoadingSpinner label="Loading group details..." />
+        <LoadingSpinner label="Opening household tab..." />
       </div>
     );
   }
@@ -204,7 +221,7 @@ export default function GroupDetailPage() {
     return (
       <div className="card">
         <ErrorBanner message={error} onRetry={fetchGroupDetail} />
-        <Link href="/groups" style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
+        <Link href="/groups" style={{ color: "var(--moss)", textDecoration: "none", fontSize: "14px", fontWeight: 600 }}>
           ← Back to Groups
         </Link>
       </div>
@@ -219,323 +236,310 @@ export default function GroupDetailPage() {
     currentMember?.role === "admin" ||
     (group?.createdBy?._id || group?.createdBy?.id || group?.createdBy || "").toString() === currentUserId;
 
-  const getCategoryColor = (cat) => {
-    switch (cat) {
-      case "rent": return { bg: "#fee2e2", text: "#991b1b" };
-      case "groceries": return { bg: "#dcfce7", text: "#166534" };
-      case "utilities": return { bg: "#fef3c7", text: "#92400e" };
-      case "food": return { bg: "#ffedd5", text: "#9a3412" };
-      case "travel": return { bg: "#e0e7ff", text: "#3730a3" };
-      default: return { bg: "#f3f4f6", text: "#374151" };
-    }
-  };
-
   const hasActiveFilters = Boolean(searchInput || categoryFilter || sortBy !== "date" || sortOrder !== "desc");
 
   return (
     <div>
-      <div style={{ marginBottom: "16px" }}>
-        <Link href="/groups" style={{ color: "#2563eb", fontSize: "14px", textDecoration: "none" }}>
-          ← Back to Groups
+      {/* Top Breadcrumbs */}
+      <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <Link href="/groups" style={{ color: "var(--moss)", fontSize: "13px", fontWeight: 600, textDecoration: "none" }}>
+          ← All Household Tabs
+        </Link>
+        <Link
+          href={`/groups/${id}/settle`}
+          style={{
+            color: "var(--mustard)",
+            fontSize: "13px",
+            fontWeight: 600,
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <Handshake size={14} />
+          <span>Settle Up →</span>
         </Link>
       </div>
 
       <ErrorBanner message={error} />
-      {actionMessage && <div className="success-message">{actionMessage}</div>}
+      {actionMessage && (
+        <div className="success-message">
+          <Check size={16} />
+          <span>{actionMessage}</span>
+        </div>
+      )}
 
-      {/* Group Header Card */}
-      <div className="card" style={{ marginTop: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+      {/* Header & Meta Card */}
+      <div className="card" style={{ marginTop: 0, padding: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
           <div>
-            <h1 style={{ fontSize: "24px", marginBottom: "4px" }}>{group.name}</h1>
-            {group.description && <p style={{ color: "#6b7280", fontSize: "14px" }}>{group.description}</p>}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+              <h1 className="font-display" style={{ fontSize: "26px", margin: 0, color: "var(--ink)" }}>
+                {group.name}
+              </h1>
+              {isAdmin && (
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    backgroundColor: "rgba(79, 107, 74, 0.15)",
+                    color: "var(--moss)",
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    fontFamily: "'IBM Plex Mono', monospace",
+                  }}
+                >
+                  Admin
+                </span>
+              )}
+            </div>
+
+            {group.description && (
+              <p className="font-body" style={{ color: "rgba(34, 41, 31, 0.7)", fontSize: "14px", margin: "0 0 10px 0" }}>
+                {group.description}
+              </p>
+            )}
+
+            {/* Invite Code Tag with Lucide Copy/Check */}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "var(--paper)", padding: "4px 10px", borderRadius: "6px", border: "1px solid var(--line)" }}>
+              <span className="font-body" style={{ fontSize: "12px", color: "rgba(34, 41, 31, 0.65)" }}>Invite Code:</span>
+              <button
+                onClick={handleCopyCode}
+                className="btn-secondary"
+                style={{
+                  width: "auto",
+                  minHeight: "auto",
+                  padding: "2px 8px",
+                  borderRadius: "9999px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  backgroundColor: "rgba(201, 154, 46, 0.15)",
+                  color: "var(--mustard)",
+                  border: "1px solid rgba(201, 154, 46, 0.3)",
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  letterSpacing: "1px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+                title="Click to copy invite code"
+              >
+                <span>{group.inviteCode}</span>
+                {copiedCode ? <Check size={12} style={{ color: "var(--moss)" }} /> : <Copy size={12} />}
+              </button>
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <Link href={`/groups/${id}/add`} style={{ textDecoration: "none" }}>
+              <button
+                className="btn-primary"
+                style={{
+                  width: "auto",
+                  padding: "8px 14px",
+                  fontSize: "13px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <Plus size={15} />
+                <span>Add expense</span>
+              </button>
+            </Link>
+            <Link href={`/groups/${id}/add-ai`} style={{ textDecoration: "none" }}>
+              <button
+                className="btn-ai"
+                style={{
+                  width: "auto",
+                  padding: "8px 14px",
+                  fontSize: "13px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <Sparkles size={15} />
+                <span>Add with AI</span>
+              </button>
+            </Link>
             {isAdmin && (
               <button
                 onClick={handleDeleteGroup}
                 disabled={deletingGroup}
+                className="btn-destructive"
                 style={{
                   width: "auto",
-                  backgroundColor: "#dc2626",
-                  padding: "6px 14px",
+                  padding: "8px 12px",
                   fontSize: "13px",
-                  fontWeight: 500,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
                 }}
               >
-                {deletingGroup ? "Deleting Group..." : "🗑️ Delete Group"}
+                <Trash2 size={13} />
+                <span>{deletingGroup ? "Deleting..." : "Delete Tab"}</span>
               </button>
             )}
             <button
               onClick={handleLeaveGroup}
+              className="btn-secondary"
               style={{
                 width: "auto",
-                backgroundColor: isAdmin ? "#4b5563" : "#dc2626",
-                padding: "6px 14px",
+                padding: "8px 12px",
                 fontSize: "13px",
-                fontWeight: 500,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
               }}
             >
-              Leave Group
+              <LogOut size={13} />
+              <span>Leave</span>
             </button>
           </div>
         </div>
 
-        <div style={{ background: "#f3f4f6", padding: "12px", borderRadius: "6px", marginTop: "16px" }}>
-          <p style={{ fontSize: "14px", margin: 0 }}>
-            Invite Code: <strong style={{ letterSpacing: "1px", color: "#1e40af" }}>{group.inviteCode}</strong>
-            <span style={{ fontSize: "12px", color: "#6b7280", marginLeft: "8px" }}>(Share this code with flatmates)</span>
-          </p>
-        </div>
+        {/* Member list line */}
+        <div style={{ marginTop: "20px", paddingTop: "14px", borderTop: "1px solid var(--line)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span
+              className="font-body"
+              style={{
+                fontSize: "12px",
+                color: "rgba(34, 41, 31, 0.6)",
+                fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <Users size={13} />
+              MEMBERS ({group.members?.length || 0}):
+            </span>
+            {group.members?.map((m) => {
+              const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "User", email: "" };
+              const memberId = memberUser._id || memberUser.id;
+              const isSelf = memberId === currentUserId;
 
-        {/* Member List Section */}
-        <h2 style={{ fontSize: "18px", marginTop: "24px", marginBottom: "12px" }}>
-          Members ({group.members?.length || 0})
-        </h2>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {group.members?.map((m) => {
-            const memberUser = typeof m.user === "object" ? m.user : { _id: m.user, name: "User", email: "" };
-            const memberId = memberUser._id || memberUser.id;
-            const isSelf = memberId === currentUserId;
-
-            return (
-              <div
-                key={memberId}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "10px 12px",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "6px",
-                  background: "#fff",
-                }}
-              >
-                <div>
-                  <strong style={{ fontSize: "15px" }}>{memberUser.name}</strong>{" "}
-                  {isSelf && <span style={{ fontSize: "12px", color: "#2563eb" }}>(You)</span>}
-                  <div style={{ fontSize: "13px", color: "#6b7280" }}>{memberUser.email}</div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      padding: "2px 8px",
-                      borderRadius: "12px",
-                      background: m.role === "admin" ? "#dbeafe" : "#f3f4f6",
-                      color: m.role === "admin" ? "#1e40af" : "#374151",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {m.role}
-                  </span>
-
+              return (
+                <span
+                  key={memberId}
+                  className="font-body"
+                  style={{
+                    fontSize: "12px",
+                    background: "var(--paper)",
+                    border: "1px solid var(--line)",
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    color: "var(--ink)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  {memberUser.name} {isSelf && <strong style={{ color: "var(--moss)" }}>(You)</strong>}
                   {isAdmin && !isSelf && (
-                    <button
+                    <span
                       onClick={() => handleRemoveMember(memberId, memberUser.name)}
-                      style={{ width: "auto", padding: "4px 8px", fontSize: "12px", backgroundColor: "#ef4444" }}
+                      style={{ cursor: "pointer", color: "var(--rust)", marginLeft: "2px", fontWeight: 700 }}
+                      title="Remove member"
                     >
-                      Remove
-                    </button>
+                      ×
+                    </span>
                   )}
-                </div>
-              </div>
-            );
-          })}
+                </span>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Balances Section */}
-      <div className="card" style={{ marginTop: "20px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h2 style={{ fontSize: "18px", margin: 0 }}>Group Balances</h2>
-          <Link href={`/groups/${id}/settle`}>
+      {/* Signature Element: The Running Tab Card (Fix 2) */}
+      <div style={{ marginTop: "20px" }}>
+        {balancesLoading ? (
+          <div className="card">
+            <LoadingSpinner label="Tallying balances on running tab..." />
+          </div>
+        ) : (
+          <RunningTabCard
+            title={`${group.name} — Running Tab`}
+            entries={balances.map((b) => {
+              const uId = (b.user?._id || b.user?.id || b.user || b.userId || "").toString();
+              const isSelf = currentUserId && uId === currentUserId.toString();
+              const name = b.name || (typeof b.user === "object" ? b.user.name : "Member");
+              return {
+                label: `${name}${isSelf ? " (You)" : ""}`,
+                amount: b.netBalance || 0,
+                tone: b.netBalance > 0 ? "positive" : b.netBalance < 0 ? "negative" : "neutral",
+              };
+            })}
+          />
+        )}
+      </div>
+
+      {/* Receipt-Style Expense Log Container (Fix 4) */}
+      <div className="card" style={{ marginTop: "20px", padding: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Receipt size={16} style={{ color: "rgba(34, 41, 31, 0.5)" }} />
+            <div>
+              <h2 className="font-display" style={{ fontSize: "19px", margin: 0 }}>
+                Expenses ({totalExpenses})
+              </h2>
+            </div>
+          </div>
+
+          <Link href={`/groups/${id}/settle`} style={{ textDecoration: "none" }}>
             <button
+              className="btn-secondary"
               style={{
                 width: "auto",
-                padding: "6px 14px",
-                fontSize: "13px",
-                backgroundColor: "#059669",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "6px",
-                fontWeight: 500,
-                cursor: "pointer",
+                padding: "6px 12px",
+                fontSize: "12px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
               }}
             >
-              🤝 Settle Up
+              <Handshake size={13} />
+              <span>Settle Up Tab</span>
             </button>
           </Link>
         </div>
 
-        {balancesLoading ? (
-          <LoadingSpinner label="Calculating group balances..." />
-        ) : balances.length === 0 ? (
-          <EmptyState
-            icon="⚖️"
-            title="No balance history yet"
-            description="Add your first group expense above to calculate who owes whom."
-          />
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
-            {balances.map((b) => {
-              const uId = (b.user?._id || b.user?.id || b.user).toString();
-              const memberInfo = group?.members?.find(
-                (m) => (m.user?._id || m.user?.id || m.user).toString() === uId
-              );
-              const userName =
-                typeof b.user === "object" && b.user.name
-                  ? b.user.name
-                  : typeof memberInfo?.user === "object"
-                  ? memberInfo.user.name
-                  : "Member";
-              const isSelf = uId === currentUserId;
-
-              const isOwed = b.netBalance > 0;
-              const owes = b.netBalance < 0;
-              const isSettled = b.netBalance === 0;
-
-              return (
-                <div
-                  key={uId}
-                  style={{
-                    padding: "12px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid",
-                    borderColor: isOwed ? "#bbf7d0" : owes ? "#fecaca" : "#e5e7eb",
-                    backgroundColor: isOwed ? "#f0fdf4" : owes ? "#fef2f2" : "#f9fafb",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#1f2937" }}>
-                      {userName} {isSelf && <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 400 }}>(You)</span>}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
-                    {isOwed && (
-                      <span style={{ fontSize: "15px", fontWeight: 700, color: "#15803d" }}>
-                        is owed ₹{b.netBalance.toFixed(2)}
-                      </span>
-                    )}
-                    {owes && (
-                      <span style={{ fontSize: "15px", fontWeight: 700, color: "#b91c1c" }}>
-                        owes ₹{Math.abs(b.netBalance).toFixed(2)}
-                      </span>
-                    )}
-                    {isSettled && (
-                      <span style={{ fontSize: "14px", fontWeight: 500, color: "#6b7280" }}>
-                        Settled up (₹0.00)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Expenses Section */}
-      <div className="card" style={{ marginTop: "20px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <div>
-            <h2 style={{ fontSize: "18px", margin: 0 }}>Expenses ({totalExpenses})</h2>
-          </div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <Link href={`/groups/${id}/add-ai`}>
-              <button
-                style={{
-                  width: "auto",
-                  padding: "6px 14px",
-                  fontSize: "13px",
-                  backgroundColor: "#4f46e5",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontWeight: 500,
-                }}
-              >
-                ✨ Add with AI
-              </button>
-            </Link>
-            <Link href={`/groups/${id}/add`}>
-              <button
-                style={{
-                  width: "auto",
-                  padding: "6px 14px",
-                  fontSize: "13px",
-                  backgroundColor: "#2563eb",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontWeight: 500,
-                }}
-              >
-                + Add Expense
-              </button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Filter, Search & Sort Toolbar */}
+        {/* Filter & Search Toolbar */}
         <div
           style={{
-            background: "#f9fafb",
-            border: "1px solid #e5e7eb",
-            borderRadius: "8px",
-            padding: "12px 14px",
-            marginBottom: "16px",
             display: "flex",
+            gap: "8px",
+            marginBottom: "18px",
             flexWrap: "wrap",
-            gap: "10px",
             alignItems: "center",
-            justifyContent: "space-between",
+            background: "var(--paper)",
+            padding: "10px",
+            borderRadius: "6px",
+            border: "1px solid var(--line)",
           }}
         >
-          {/* Search Box */}
-          <div style={{ flex: "1 1 200px", minWidth: "180px" }}>
+          <div style={{ flex: "2 1 180px" }}>
             <input
               type="text"
-              placeholder="🔍 Search description..."
+              placeholder="Search expenses..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "7px 10px",
-                fontSize: "13px",
-                border: "1px solid #d1d5db",
-                borderRadius: "6px",
-                background: "#ffffff",
-                boxSizing: "border-box",
-              }}
+              style={{ margin: 0, minHeight: "36px", padding: "6px 10px", fontSize: "13px" }}
             />
           </div>
 
-          {/* Category Dropdown */}
-          <div style={{ flex: "0 1 150px" }}>
+          <div style={{ flex: "1 1 120px" }}>
             <select
               value={categoryFilter}
               onChange={(e) => handleFilterChange(setCategoryFilter)(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "7px 10px",
-                fontSize: "13px",
-                border: "1px solid #d1d5db",
-                borderRadius: "6px",
-                background: "#ffffff",
-                boxSizing: "border-box",
-              }}
+              style={{ margin: 0, minHeight: "36px", padding: "6px 10px", fontSize: "13px" }}
             >
-              <option value="">All Categories</option>
+              <option value="">All categories</option>
               <option value="rent">Rent</option>
               <option value="groceries">Groceries</option>
               <option value="utilities">Utilities</option>
@@ -545,63 +549,33 @@ export default function GroupDetailPage() {
             </select>
           </div>
 
-          {/* Sort By Dropdown */}
-          <div style={{ flex: "0 1 120px" }}>
+          <div style={{ flex: "1 1 110px" }}>
             <select
               value={sortBy}
               onChange={(e) => handleFilterChange(setSortBy)(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "7px 10px",
-                fontSize: "13px",
-                border: "1px solid #d1d5db",
-                borderRadius: "6px",
-                background: "#ffffff",
-                boxSizing: "border-box",
-              }}
+              style={{ margin: 0, minHeight: "36px", padding: "6px 10px", fontSize: "13px" }}
             >
               <option value="date">Sort: Date</option>
               <option value="amount">Sort: Amount</option>
             </select>
           </div>
 
-          {/* Sort Order Toggle */}
           <div>
             <button
               onClick={() => handleFilterChange(setSortOrder)(sortOrder === "desc" ? "asc" : "desc")}
-              style={{
-                width: "auto",
-                padding: "7px 12px",
-                fontSize: "13px",
-                backgroundColor: "#ffffff",
-                color: "#374151",
-                border: "1px solid #d1d5db",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: 500,
-              }}
-              title={sortOrder === "desc" ? "Descending (Newest / Largest first)" : "Ascending (Oldest / Smallest first)"}
+              className="btn-secondary"
+              style={{ width: "auto", padding: "6px 10px", fontSize: "12px", minHeight: "36px" }}
             >
-              {sortOrder === "desc" ? "↓ Desc" : "↑ Asc"}
+              {sortOrder === "desc" ? "↓ Newest" : "↑ Oldest"}
             </button>
           </div>
 
-          {/* Reset Filters button if any filter is active */}
           {hasActiveFilters && (
             <div>
               <button
                 onClick={handleResetFilters}
-                style={{
-                  width: "auto",
-                  padding: "7px 12px",
-                  fontSize: "12px",
-                  backgroundColor: "#fee2e2",
-                  color: "#991b1b",
-                  border: "1px solid #fca5a5",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontWeight: 500,
-                }}
+                className="btn-destructive"
+                style={{ width: "auto", padding: "6px 10px", fontSize: "12px", minHeight: "36px" }}
               >
                 ✕ Reset
               </button>
@@ -609,142 +583,45 @@ export default function GroupDetailPage() {
           )}
         </div>
 
+        {/* Receipt Expense Rows via ExpenseRow component */}
         {expensesLoading ? (
-          <LoadingSpinner label="Fetching expenses..." />
+          <LoadingSpinner label="Fetching itemized ledger..." />
         ) : expenses.length === 0 ? (
           hasActiveFilters ? (
             <EmptyState
-              icon="🔍"
-              title="No expenses match your filters"
-              description="Try adjusting your search term, category, or date range."
+              title="No items matched"
+              description="No expenses found matching your filter criteria."
               action={
-                <button
-                  onClick={handleResetFilters}
-                  style={{
-                    width: "auto",
-                    padding: "8px 16px",
-                    backgroundColor: "#2563eb",
-                    fontSize: "13px",
-                  }}
-                >
-                  Clear Filters
+                <button onClick={handleResetFilters} className="btn-secondary" style={{ width: "auto", padding: "6px 14px", fontSize: "13px" }}>
+                  Clear filter
                 </button>
               }
             />
           ) : (
             <EmptyState
-              icon="🧾"
-              title="No expenses recorded yet"
-              description="Get started by recording the first expense for your group!"
+              title="No expenses yet"
+              description="Add the first one to start the tab."
               action={
-                <Link href={`/groups/${id}/add`}>
-                  <button
-                    style={{
-                      width: "auto",
-                      padding: "8px 16px",
-                      backgroundColor: "#2563eb",
-                      fontSize: "13px",
-                    }}
-                  >
-                    + Add First Expense
+                <Link href={`/groups/${id}/add`} style={{ textDecoration: "none" }}>
+                  <button className="btn-primary" style={{ width: "auto", padding: "8px 16px", fontSize: "13px" }}>
+                    Add first expense
                   </button>
                 </Link>
               }
             />
           )
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {expenses.map((exp) => {
-              const paidByName = typeof exp.paidBy === "object" ? exp.paidBy?.name : "Someone";
-              const isCreator = (exp.createdBy?._id || exp.createdBy?.id || exp.createdBy) === currentUserId;
-              const canDelete = isCreator || isAdmin;
-              const catStyle = getCategoryColor(exp.category);
-
-              return (
-                <div
-                  key={exp._id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "12px 14px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    background: "#ffffff",
-                  }}
-                >
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                      <strong style={{ fontSize: "15px", color: "#111827" }}>{exp.description}</strong>
-                      <span
-                        style={{
-                          fontSize: "11px",
-                          padding: "1px 6px",
-                          borderRadius: "10px",
-                          background: catStyle.bg,
-                          color: catStyle.text,
-                          fontWeight: 600,
-                          textTransform: "capitalize",
-                        }}
-                      >
-                        {exp.category}
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                      Paid by <strong>{paidByName}</strong> • Split with {exp.participants?.length || 0} members •{" "}
-                      {new Date(exp.date || exp.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "16px", fontWeight: 700, color: "#111827" }}>
-                        ₹{(exp.amount / 100).toFixed(2)}
-                      </div>
-                      <div style={{ fontSize: "11px", color: "#9ca3af", textTransform: "capitalize" }}>
-                        {exp.splitType || "equal"} split
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      {isCreator && (
-                        <Link href={`/groups/${id}/edit/${exp._id}`}>
-                          <button
-                            style={{
-                              width: "auto",
-                              padding: "4px 8px",
-                              fontSize: "12px",
-                              backgroundColor: "#eff6ff",
-                              color: "#2563eb",
-                              border: "1px solid #bfdbfe",
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </Link>
-                      )}
-
-                      {canDelete && (
-                        <button
-                          onClick={() => handleDeleteExpense(exp._id, exp.description)}
-                          style={{
-                            width: "auto",
-                            padding: "4px 8px",
-                            fontSize: "12px",
-                            backgroundColor: "#fef2f2",
-                            color: "#dc2626",
-                            border: "1px solid #fecaca",
-                          }}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div>
+            {expenses.map((exp) => (
+              <ExpenseRow
+                key={exp._id}
+                expense={exp}
+                groupId={id}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+                onDelete={handleDeleteExpense}
+              />
+            ))}
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
@@ -753,44 +630,52 @@ export default function GroupDetailPage() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginTop: "16px",
-                  paddingTop: "12px",
-                  borderTop: "1px solid #e5e7eb",
+                  padding: "14px 0 0 0",
+                  marginTop: "8px",
+                  flexWrap: "wrap",
+                  gap: "8px",
                 }}
               >
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  style={{
-                    width: "auto",
-                    padding: "4px 10px",
-                    fontSize: "13px",
-                    backgroundColor: page <= 1 ? "#e5e7eb" : "#f3f4f6",
-                    color: page <= 1 ? "#9ca3af" : "#374151",
-                    cursor: page <= 1 ? "not-allowed" : "pointer",
-                  }}
-                >
-                  ← Previous
-                </button>
+                <div className="font-mono tabular-nums" style={{ fontSize: "12px", color: "rgba(34, 41, 31, 0.6)" }}>
+                  Page {page} of {totalPages} ({totalExpenses} entries)
+                </div>
 
-                <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                  Page {page} of {totalPages} ({totalExpenses} results)
-                </span>
-
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  style={{
-                    width: "auto",
-                    padding: "4px 10px",
-                    fontSize: "13px",
-                    backgroundColor: page >= totalPages ? "#e5e7eb" : "#f3f4f6",
-                    color: page >= totalPages ? "#9ca3af" : "#374151",
-                    cursor: page >= totalPages ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Next →
-                </button>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1 || expensesLoading}
+                    className="btn-secondary"
+                    style={{
+                      width: "auto",
+                      padding: "4px 10px",
+                      fontSize: "12px",
+                      minHeight: "30px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <ChevronLeft size={13} />
+                    <span>Prev</span>
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages || expensesLoading}
+                    className="btn-secondary"
+                    style={{
+                      width: "auto",
+                      padding: "4px 10px",
+                      fontSize: "12px",
+                      minHeight: "30px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <span>Next</span>
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
               </div>
             )}
           </div>

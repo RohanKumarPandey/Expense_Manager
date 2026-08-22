@@ -9,6 +9,10 @@ import dynamic from "next/dynamic";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ErrorBanner from "../../components/ErrorBanner";
 import EmptyState from "../../components/EmptyState";
+import Amount from "../../components/Amount";
+import CategoryTag from "../../components/CategoryTag";
+import RunningTabCard from "../../components/RunningTabCard";
+import { Wallet, Receipt, ArrowRight, Handshake } from "lucide-react";
 
 const CategoryPieChart = dynamic(
   () => import("../../components/CategoryPieChart"),
@@ -17,15 +21,15 @@ const CategoryPieChart = dynamic(
     loading: () => (
       <div
         style={{
-          height: "280px",
+          height: "260px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#6b7280",
-          fontSize: "14px",
+          color: "rgba(34, 41, 31, 0.5)",
+          fontSize: "13px",
         }}
       >
-        Loading chart...
+        Loading breakdown chart...
       </div>
     ),
   }
@@ -38,15 +42,15 @@ const MonthlySpendChart = dynamic(
     loading: () => (
       <div
         style={{
-          height: "280px",
+          height: "260px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: "#6b7280",
-          fontSize: "14px",
+          color: "rgba(34, 41, 31, 0.5)",
+          fontSize: "13px",
         }}
       >
-        Loading chart...
+        Loading trend chart...
       </div>
     ),
   }
@@ -84,7 +88,7 @@ export default function DashboardPage() {
   if (authLoading || loading) {
     return (
       <div className="card">
-        <LoadingSpinner label="Aggregating household financial data..." />
+        <LoadingSpinner label="Aggregating household ledgers..." />
       </div>
     );
   }
@@ -93,7 +97,7 @@ export default function DashboardPage() {
     return (
       <div className="card">
         <ErrorBanner message={error} onRetry={fetchDashboard} />
-        <Link href="/groups" style={{ color: "#2563eb", textDecoration: "none", fontSize: "14px" }}>
+        <Link href="/groups" style={{ color: "var(--moss)", textDecoration: "none", fontSize: "14px", fontWeight: 600 }}>
           ← Back to Groups
         </Link>
       </div>
@@ -113,128 +117,111 @@ export default function DashboardPage() {
 
   return (
     <div>
-      {/* Top Header & Navigation */}
+      {/* Top Header & Context Area */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "baseline",
           marginBottom: "20px",
+          flexWrap: "wrap",
+          gap: "12px",
         }}
       >
         <div>
-          <h1 style={{ fontSize: "26px", fontWeight: 700, margin: 0, color: "#111827" }}>
-            📊 Household Dashboard
+          <h1 className="font-display" style={{ fontSize: "26px", margin: "0 0 2px 0", color: "var(--ink)" }}>
+            Ledger Dashboard
           </h1>
-          <p style={{ color: "#6b7280", fontSize: "14px", marginTop: "4px", margin: 0 }}>
-            Cross-group financial overview for <strong>{user?.name}</strong>
+          <p className="font-body" style={{ color: "rgba(34, 41, 31, 0.65)", fontSize: "14px", margin: 0 }}>
+            Cross-tab financial standing for <strong>{user?.name}</strong>
           </p>
         </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <Link href="/groups">
-            <button
-              style={{
-                width: "auto",
-                padding: "8px 14px",
-                fontSize: "13px",
-                backgroundColor: "#2563eb",
-              }}
-            >
-              My Groups
-            </button>
-          </Link>
-          <Link href="/">
-            <button
-              style={{
-                width: "auto",
-                padding: "8px 14px",
-                fontSize: "13px",
-                backgroundColor: "#f3f4f6",
-                color: "#374151",
-                border: "1px solid #d1d5db",
-              }}
-            >
-              Home
-            </button>
-          </Link>
-        </div>
+
+        <Link href="/groups" style={{ textDecoration: "none" }}>
+          <button
+            className="btn-primary"
+            style={{
+              width: "auto",
+              padding: "6px 14px",
+              fontSize: "13px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <Wallet size={15} />
+            <span>My Tabs</span>
+          </button>
+        </Link>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      <ErrorBanner message={error} />
 
-      {/* Top Level Financial Summary Cards */}
+      {/* Top Level Financial Summary Cards with monospace amounts */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
           gap: "14px",
           marginBottom: "20px",
         }}
       >
-        {/* You Are Owed Card */}
+        {/* Owed to You */}
         <div
+          className="card"
           style={{
-            backgroundColor: "#f0fdf4",
-            border: "1px solid #bbf7d0",
-            borderRadius: "8px",
-            padding: "18px",
+            marginTop: 0,
+            padding: "18px 20px",
+            borderLeft: "3px solid var(--moss)",
           }}
         >
-          <div style={{ fontSize: "13px", fontWeight: 600, color: "#166534", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            You are owed
+          <div className="font-body" style={{ fontSize: "12px", fontWeight: 600, color: "var(--moss)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
+            Owed to you
           </div>
-          <div style={{ fontSize: "28px", fontWeight: 800, color: "#15803d", marginTop: "4px" }}>
-            ₹{totalOwed.toFixed(2)}
+          <div style={{ fontSize: "26px" }}>
+            <Amount value={totalOwed} tone="positive" style={{ fontSize: "26px", fontWeight: 700 }} />
           </div>
-          <div style={{ fontSize: "12px", color: "#166534", marginTop: "4px" }}>
-            Across all groups
+          <div className="font-body" style={{ fontSize: "12px", color: "rgba(34, 41, 31, 0.6)", marginTop: "2px" }}>
+            Across all household tabs
           </div>
         </div>
 
-        {/* You Owe Card */}
+        {/* You Owe */}
         <div
+          className="card"
           style={{
-            backgroundColor: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: "8px",
-            padding: "18px",
+            marginTop: 0,
+            padding: "18px 20px",
+            borderLeft: "3px solid var(--rust)",
           }}
         >
-          <div style={{ fontSize: "13px", fontWeight: 600, color: "#991b1b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          <div className="font-body" style={{ fontSize: "12px", fontWeight: 600, color: "var(--rust)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
             You owe
           </div>
-          <div style={{ fontSize: "28px", fontWeight: 800, color: "#dc2626", marginTop: "4px" }}>
-            ₹{totalOwing.toFixed(2)}
+          <div style={{ fontSize: "26px" }}>
+            <Amount value={totalOwing} tone="negative" style={{ fontSize: "26px", fontWeight: 700 }} />
           </div>
-          <div style={{ fontSize: "12px", color: "#991b1b", marginTop: "4px" }}>
-            Across all groups
+          <div className="font-body" style={{ fontSize: "12px", color: "rgba(34, 41, 31, 0.6)", marginTop: "2px" }}>
+            Outstanding household debt
           </div>
         </div>
 
-        {/* Net Position Card */}
+        {/* Net Standing */}
         <div
+          className="card"
           style={{
-            backgroundColor: netOverall > 0 ? "#eff6ff" : netOverall < 0 ? "#fff7ed" : "#f9fafb",
-            border: "1px solid",
-            borderColor: netOverall > 0 ? "#bfdbfe" : netOverall < 0 ? "#fed7aa" : "#e5e7eb",
-            borderRadius: "8px",
-            padding: "18px",
+            marginTop: 0,
+            padding: "18px 20px",
+            borderLeft: `3px solid ${netOverall > 0 ? "var(--moss)" : netOverall < 0 ? "var(--rust)" : "var(--line)"}`,
           }}
         >
-          <div style={{ fontSize: "13px", fontWeight: 600, color: "#4b5563", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            Net Position
+          <div className="font-body" style={{ fontSize: "12px", fontWeight: 600, color: "var(--ink)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>
+            Net Standing
           </div>
-          <div
-            style={{
-              fontSize: "28px",
-              fontWeight: 800,
-              color: netOverall > 0 ? "#2563eb" : netOverall < 0 ? "#c2410c" : "#374151",
-              marginTop: "4px",
-            }}
-          >
-            {netOverall >= 0 ? `+₹${netOverall.toFixed(2)}` : `-₹${Math.abs(netOverall).toFixed(2)}`}
+          <div style={{ fontSize: "26px" }}>
+            <Amount value={Math.abs(netOverall)} tone={netOverall > 0 ? "positive" : netOverall < 0 ? "negative" : "neutral"} style={{ fontSize: "26px", fontWeight: 700 }} />
           </div>
-          <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+          <div className="font-body" style={{ fontSize: "12px", color: "rgba(34, 41, 31, 0.6)", marginTop: "2px" }}>
             {netOverall > 0
               ? "Overall in credit"
               : netOverall < 0
@@ -244,110 +231,48 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Per-Group Breakdown Section */}
-      <div className="card" style={{ marginTop: 0, marginBottom: "20px" }}>
-        <h2 style={{ fontSize: "18px", marginBottom: "14px" }}>
-          Per-Group Balances ({groupsSummary.length})
-        </h2>
-
-        {groupsSummary.length === 0 ? (
-          <EmptyState
-            icon="👥"
-            title="No group balances yet"
-            description="Join or create a flatmate group to see your aggregated financial standing."
-            action={
-              <Link href="/groups">
-                <button style={{ width: "auto", padding: "8px 16px", fontSize: "13px" }}>
-                  Create or Join Group
-                </button>
-              </Link>
-            }
-          />
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
-            {groupsSummary.map((g) => {
-              const isOwed = g.netBalance > 0;
-              const owes = g.netBalance < 0;
-              const isSettled = g.netBalance === 0;
-
-              return (
-                <div
-                  key={g.groupId}
-                  style={{
-                    padding: "14px",
-                    borderRadius: "8px",
-                    border: "1px solid",
-                    borderColor: isOwed ? "#bbf7d0" : owes ? "#fecaca" : "#e5e7eb",
-                    backgroundColor: isOwed ? "#f0fdf4" : owes ? "#fef2f2" : "#f9fafb",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                    <Link
-                      href={`/groups/${g.groupId}`}
-                      style={{
-                        fontSize: "15px",
-                        fontWeight: 600,
-                        color: "#111827",
-                        textDecoration: "none",
-                      }}
-                    >
-                      {g.groupName} →
-                    </Link>
-                  </div>
-
-                  <div>
-                    {isOwed && (
-                      <span style={{ fontSize: "15px", fontWeight: 700, color: "#15803d" }}>
-                        is owed ₹{g.netBalance.toFixed(2)}
-                      </span>
-                    )}
-                    {owes && (
-                      <span style={{ fontSize: "15px", fontWeight: 700, color: "#b91c1c" }}>
-                        owes ₹{Math.abs(g.netBalance).toFixed(2)}
-                      </span>
-                    )}
-                    {isSettled && (
-                      <span style={{ fontSize: "14px", fontWeight: 500, color: "#6b7280" }}>
-                        Settled up (₹0.00)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      {/* Signature Element: RunningTabCard wired into Dashboard (Fix 2) */}
+      <div style={{ marginBottom: "20px" }}>
+        <RunningTabCard
+          title="Per-Tab Standing"
+          entries={groupsSummary.map((g) => ({
+            label: g.groupName,
+            amount: g.netBalance,
+            tone: g.netBalance > 0 ? "positive" : g.netBalance < 0 ? "negative" : "neutral",
+          }))}
+        />
       </div>
 
       {/* Visualizations Grid */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: "20px",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          gap: "16px",
           marginBottom: "20px",
         }}
       >
-        {/* Category Breakdown (Personal Share) */}
-        <div className="card" style={{ marginTop: 0 }}>
-          <div style={{ marginBottom: "14px" }}>
-            <h2 style={{ fontSize: "18px", margin: 0 }}>Where My Money Goes</h2>
-            <p style={{ color: "#6b7280", fontSize: "12px", marginTop: "2px", margin: 0 }}>
-              Category breakdown based on <strong>your personal share</strong>
+        {/* Category Breakdown */}
+        <div className="card" style={{ marginTop: 0, padding: "20px" }}>
+          <div style={{ marginBottom: "12px" }}>
+            <h2 className="font-display" style={{ fontSize: "17px", margin: 0 }}>
+              Where My Money Goes
+            </h2>
+            <p className="font-body" style={{ color: "rgba(34, 41, 31, 0.6)", fontSize: "12px", margin: 0 }}>
+              Category breakdown of your personal share
             </p>
           </div>
           <CategoryPieChart data={categoryBreakdown} />
         </div>
 
-        {/* Monthly Household Spend Trend */}
-        <div className="card" style={{ marginTop: 0 }}>
-          <div style={{ marginBottom: "14px" }}>
-            <h2 style={{ fontSize: "18px", margin: 0 }}>Household Spend Trend</h2>
-            <p style={{ color: "#6b7280", fontSize: "12px", marginTop: "2px", margin: 0 }}>
-              Total group spending over time across all groups
+        {/* Monthly Spend Trend */}
+        <div className="card" style={{ marginTop: 0, padding: "20px" }}>
+          <div style={{ marginBottom: "12px" }}>
+            <h2 className="font-display" style={{ fontSize: "17px", margin: 0 }}>
+              Household Spending Trend
+            </h2>
+            <p className="font-body" style={{ color: "rgba(34, 41, 31, 0.6)", fontSize: "12px", margin: 0 }}>
+              Total spending over the last 6 months
             </p>
           </div>
           <MonthlySpendChart data={monthlyTrend} />
@@ -355,17 +280,21 @@ export default function DashboardPage() {
       </div>
 
       {/* Cross-Group Recent Activity Feed */}
-      <div className="card" style={{ marginTop: 0 }}>
-        <h2 style={{ fontSize: "18px", marginBottom: "14px" }}>
-          Recent Activity Feed ({recentActivity.length})
-        </h2>
+      <div className="card" style={{ marginTop: 0, padding: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+          <Receipt size={16} style={{ color: "rgba(34, 41, 31, 0.5)" }} />
+          <h2 className="font-display" style={{ fontSize: "18px", margin: 0 }}>
+            Recent Activity ({recentActivity.length})
+          </h2>
+        </div>
 
         {recentActivity.length === 0 ? (
-          <div style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", padding: "20px 0" }}>
-            No recent activity recorded across your groups.
-          </div>
+          <EmptyState
+            title="No recent activity"
+            description="When expenses or settlements are added to any tab, they'll appear here."
+          />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
             {recentActivity.map((item, index) => {
               const isExpense = item.type === "expense";
               const dateStr = item.date
@@ -379,69 +308,51 @@ export default function DashboardPage() {
               return (
                 <div
                   key={item.data?.id || item.data?._id || index}
+                  className="receipt-row"
                   style={{
+                    padding: "10px 0",
                     display: "flex",
                     justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "12px 14px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    backgroundColor: isExpense ? "#ffffff" : "#f0fdf4",
+                    alignItems: "baseline",
+                    borderBottom: index === recentActivity.length - 1 ? "none" : "1px dotted var(--line)",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span
-                      style={{
-                        fontSize: "18px",
-                        padding: "6px",
-                        borderRadius: "8px",
-                        background: isExpense ? "#eff6ff" : "#dcfce7",
-                      }}
-                    >
-                      {isExpense ? "💳" : "🤝"}
-                    </span>
-
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                    {isExpense ? (
+                      <Receipt size={14} style={{ color: "rgba(34, 41, 31, 0.5)", flexShrink: 0 }} />
+                    ) : (
+                      <Handshake size={14} style={{ color: "var(--moss)", flexShrink: 0 }} />
+                    )}
                     <div>
-                      {isExpense ? (
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#111827" }}>
-                          <strong>{item.data?.paidBy?.name || "Member"}</strong> added{" "}
-                          <em>"{item.data?.description || "Expense"}"</em>
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "#166534" }}>
-                          <strong>{item.data?.from?.name || "Member"}</strong> paid{" "}
-                          <strong>{item.data?.to?.name || "Member"}</strong>
-                          {item.data?.note ? ` (${item.data.note})` : ""}
-                        </div>
-                      )}
-
-                      <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
+                      <div className="font-body" style={{ fontSize: "13px", fontWeight: 500, color: "var(--ink)" }}>
+                        {isExpense ? (
+                          <>
+                            <strong>{item.data?.paidBy?.name || "Member"}</strong> added{" "}
+                            <em>"{item.data?.description || "Expense"}"</em>
+                          </>
+                        ) : (
+                          <>
+                            <strong>{item.data?.from?.name || "Member"}</strong> paid{" "}
+                            <strong>{item.data?.to?.name || "Member"}</strong>
+                          </>
+                        )}
                         {isExpense && item.data?.category && (
-                          <span
-                            style={{
-                              textTransform: "capitalize",
-                              marginRight: "6px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {item.data.category} •
+                          <span style={{ marginLeft: "6px" }}>
+                            <CategoryTag category={item.data.category} />
                           </span>
                         )}
+                      </div>
+                      <div className="font-mono tabular-nums" style={{ fontSize: "11px", color: "rgba(34, 41, 31, 0.5)" }}>
                         {dateStr}
                       </div>
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: 700,
-                      color: isExpense ? "#111827" : "#166534",
-                      textAlign: "right",
-                    }}
-                  >
-                    ₹{item.data?.amount?.toFixed(2)}
-                  </div>
+                  <Amount
+                    value={item.data?.amount}
+                    tone={isExpense ? "neutral" : "positive"}
+                    style={{ fontSize: "14px" }}
+                  />
                 </div>
               );
             })}

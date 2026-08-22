@@ -1,17 +1,19 @@
 "use client";
 
+import { AlertCircle } from "lucide-react";
+
 export default function ErrorBanner({ message, onRetry }) {
   if (!message) return null;
 
   return (
     <div
       style={{
-        backgroundColor: "#fef2f2",
-        border: "1px solid #fecaca",
-        color: "#b91c1c",
+        backgroundColor: "rgba(168, 73, 47, 0.08)",
+        border: "1px solid rgba(168, 73, 47, 0.3)",
+        color: "var(--rust)",
         fontSize: "14px",
         borderRadius: "8px",
-        padding: "12px 16px",
+        padding: "10px 14px",
         marginBottom: "16px",
         display: "flex",
         alignItems: "center",
@@ -20,22 +22,19 @@ export default function ErrorBanner({ message, onRetry }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <span>⚠️</span>
-        <span>{message}</span>
+        <AlertCircle size={16} style={{ color: "var(--rust)", flexShrink: 0 }} />
+        <span className="font-body" style={{ fontWeight: 500 }}>{message}</span>
       </div>
       {onRetry && (
         <button
           onClick={onRetry}
+          className="btn-destructive"
           style={{
             width: "auto",
-            backgroundColor: "transparent",
-            color: "#b91c1c",
-            fontWeight: 600,
-            textDecoration: "underline",
-            padding: "4px 8px",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "13px",
+            padding: "3px 8px",
+            fontSize: "12px",
+            minHeight: "26px",
+            borderRadius: "6px",
           }}
         >
           Retry

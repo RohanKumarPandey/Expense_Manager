@@ -1,9 +1,10 @@
 import { AuthProvider } from "../lib/authContext";
+import Navbar from "../components/Navbar";
 import "./globals.css";
 
 export const metadata = {
-  title: "Flatmate Expense Manager",
-  description: "Smart, debt-simplified expense splitting for roommates and flatmates.",
+  title: "The Running Tab — Shared Household Ledger",
+  description: "A running tab between people who live together. Shared household expenses, receipts, and debt simplification.",
 };
 
 export const viewport = {
@@ -16,11 +17,12 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <AuthProvider>
+          <Navbar />
           <main
             style={{
-              maxWidth: "880px",
+              maxWidth: "960px",
               width: "100%",
-              margin: "24px auto",
+              margin: "20px auto 48px auto",
               padding: "0 16px",
             }}
           >
